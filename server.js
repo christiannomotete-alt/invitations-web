@@ -1,342 +1,99 @@
 const path = require("path");
 const fs = require("fs");
-const crypto = require("crypto");
 const express = require("express");
 const session = require("express-session");
+const helmet = require("helmet");
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const multer = require("multer");
-const Database = require("better-sqlite3");
 const PDFDocument = require("pdfkit");
 
+const config = require("./config");
+const { db, initSchema, repairGuestsPhoneData } = require("./db");
+const {
+  randomToken,
+  normalizePhone,
+  extractPhoneFromText,
+  hashPassword,
+  verifyPassword,
+  sanitizeEventType,
+  getEventTypeMeta,
+  baseUrl,
+  isPublicHttpsUrl,
+  buildEnvelopeMessage,
+  parseGuests
+} = require("./utils");
+const {
+  sendWhatsAppTextMessage,
+  sendWhatsAppTemplateMessage,
+  sendWhatsAppImageMessage
+} = require("./whatsapp");
+
+const {
+  GOOGLE_OAUTH_ENABLED,
+  GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET,
+  GOOGLE_CALLBACK_URL,
+  WHATSAPP_AUTO_ENABLED,
+  WHATSAPP_ACCESS_TOKEN,
+  WHATSAPP_PHONE_NUMBER_ID,
+  WHATSAPP_API_VERSION,
+  WHATSAPP_TEMPLATE_NAME,
+  WHATSAPP_TEMPLATE_LANGUAGE,
+  WHATSAPP_TEMPLATE_FALLBACK_NAME,
+  WHATSAPP_TEMPLATE_FALLBACK_LANGUAGE,
+  WHATSAPP_TEMPLATE_PARAM_MODE,
+  WHATSAPP_ENVELOPE_IMAGE_MODE,
+  WHATSAPP_ENVELOPE_IMAGE_URL,
+  WHATSAPP_ENVELOPE_IMAGE_CAPTION,
+  EVENT_TYPES,
+  PORT,
+  isProduction
+} = config;
+
 const app = express();
-const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
-const GOOGLE_CREDENTIALS_PATH =
-  process.env.GOOGLE_CREDENTIALS_PATH || path.join(ROOT, "google-oauth-client.json");
-const WHATSAPP_CONFIG_PATH =
-  process.env.WHATSAPP_CONFIG_PATH || path.join(ROOT, "whatsapp-config.json");
-const PUBLIC_DIR = path.join(ROOT, "public");
-const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(ROOT, "data"));
-const UPLOADS_DIR = path.resolve(process.env.UPLOADS_DIR || path.join(PUBLIC_DIR, "uploads"));
-const DB_PATH = path.join(DATA_DIR, "invitation.db");
-const LOGS_DIR = path.join(ROOT, "logs");
+const PUBLIC_DIR = config.PUBLIC_DIR;
+const DATA_DIR = config.DATA_DIR;
+const UPLOADS_DIR = config.UPLOADS_DIR;
+const LOGS_DIR = config.LOGS_DIR;
 const WHATSAPP_LOG_PATH = path.join(LOGS_DIR, "whatsapp-send.log");
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 fs.mkdirSync(LOGS_DIR, { recursive: true });
 
-const db = new Database(DB_PATH);
-db.pragma("foreign_keys = ON");
-
-db.exec(`
-CREATE TABLE IF NOT EXISTS users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  full_name TEXT NOT NULL,
-  email TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS invitations (
-  id TEXT PRIMARY KEY,
-  owner_user_id INTEGER NOT NULL,
-  event_type TEXT NOT NULL DEFAULT 'mariage',
-  couple_names TEXT NOT NULL,
-  event_date TEXT NOT NULL,
-  venue TEXT NOT NULL,
-  message TEXT NOT NULL,
-  image_path TEXT,
-  og_title TEXT,
-  og_description TEXT,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY(owner_user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS guests (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  invitation_id TEXT NOT NULL,
-  full_name TEXT NOT NULL,
-  phone TEXT,
-  token TEXT UNIQUE NOT NULL,
-  rsvp_status TEXT NOT NULL DEFAULT 'pending' CHECK (rsvp_status IN ('pending', 'yes', 'no')),
-  responded_at TEXT,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY(invitation_id) REFERENCES invitations(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS rsvp_events (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  invitation_id TEXT NOT NULL,
-  guest_id INTEGER NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('yes', 'no')),
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY(invitation_id) REFERENCES invitations(id) ON DELETE CASCADE,
-  FOREIGN KEY(guest_id) REFERENCES guests(id) ON DELETE CASCADE
-);
-`);
-
-function ensureUsersGoogleColumn() {
-  const columns = db.prepare("PRAGMA table_info(users)").all();
-  const hasGoogleId = columns.some((col) => col.name === "google_id");
-  if (!hasGoogleId) {
-    db.exec("ALTER TABLE users ADD COLUMN google_id TEXT");
-  }
-  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL");
-}
-
-ensureUsersGoogleColumn();
-
-function ensureInvitationEventTypeColumn() {
-  const columns = db.prepare("PRAGMA table_info(invitations)").all();
-  const hasEventType = columns.some((col) => col.name === "event_type");
-  if (!hasEventType) {
-    db.exec("ALTER TABLE invitations ADD COLUMN event_type TEXT NOT NULL DEFAULT 'mariage'");
-  }
-}
-
-ensureInvitationEventTypeColumn();
+initSchema();
+repairGuestsPhoneData(db, extractPhoneFromText);
 
 app.set("view engine", "ejs");
-app.set("views", path.join(ROOT, "views"));
+app.set("views", config.VIEWS_DIR);
 
+if (isProduction) {
+  app.set("trust proxy", 1);
+}
+
+app.use(helmet());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(PUBLIC_DIR));
 app.use("/uploads", express.static(UPLOADS_DIR));
 
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || "invitation-secret-dev",
+    secret: process.env.SESSION_SECRET || config.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
       sameSite: "lax",
-      secure: false,
+      secure: isProduction,
       maxAge: 1000 * 60 * 60 * 24 * 7
     }
   })
 );
 
-function loadGoogleCredentialsFromFile(filePath) {
-  try {
-    if (!fs.existsSync(filePath)) return null;
-    const raw = fs.readFileSync(filePath, "utf8");
-    const parsed = JSON.parse(raw);
-    const source = parsed.web || parsed.installed;
-    if (!source) return null;
-    return {
-      clientId: String(source.client_id || "").trim(),
-      clientSecret: String(source.client_secret || "").trim(),
-      callbackUrl: String((source.redirect_uris && source.redirect_uris[0]) || "").trim()
-    };
-  } catch {
-    return null;
-  }
-}
-
-const googleFileCreds = loadGoogleCredentialsFromFile(GOOGLE_CREDENTIALS_PATH);
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || googleFileCreds?.clientId || "";
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || googleFileCreds?.clientSecret || "";
-const GOOGLE_CALLBACK_URL =
-  process.env.GOOGLE_CALLBACK_URL ||
-  googleFileCreds?.callbackUrl ||
-  "http://localhost:3000/auth/google/callback";
-const GOOGLE_OAUTH_ENABLED = Boolean(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET);
-
-function loadWhatsAppConfigFromFile(filePath) {
-  try {
-    if (!fs.existsSync(filePath)) return null;
-    const raw = fs.readFileSync(filePath, "utf8");
-    const parsed = JSON.parse(raw);
-    return {
-      accessToken: String(parsed.access_token || "").trim(),
-      phoneNumberId: String(parsed.phone_number_id || "").trim(),
-      apiVersion: String(parsed.api_version || "").trim(),
-      templateName: String(parsed.template_name || "").trim(),
-      templateLanguage: String(parsed.template_language || "").trim(),
-      templateFallbackName: String(parsed.template_fallback_name || "").trim(),
-      templateFallbackLanguage: String(parsed.template_fallback_language || "").trim(),
-      templateParamMode: String(parsed.template_param_mode || "").trim(),
-      envelopeImageMode: String(parsed.envelope_image_mode || "").trim(),
-      envelopeImageUrl: String(parsed.envelope_image_url || "").trim(),
-      envelopeImageCaption: String(parsed.envelope_image_caption || "").trim()
-    };
-  } catch {
-    return null;
-  }
-}
-
-const whatsappFileConfig = loadWhatsAppConfigFromFile(WHATSAPP_CONFIG_PATH);
-const WHATSAPP_ACCESS_TOKEN =
-  process.env.WHATSAPP_ACCESS_TOKEN || whatsappFileConfig?.accessToken || "";
-const WHATSAPP_PHONE_NUMBER_ID =
-  process.env.WHATSAPP_PHONE_NUMBER_ID || whatsappFileConfig?.phoneNumberId || "";
-const WHATSAPP_API_VERSION =
-  process.env.WHATSAPP_API_VERSION || whatsappFileConfig?.apiVersion || "v22.0";
-const WHATSAPP_TEMPLATE_NAME =
-  process.env.WHATSAPP_TEMPLATE_NAME || whatsappFileConfig?.templateName || "hello_world";
-const WHATSAPP_TEMPLATE_LANGUAGE =
-  process.env.WHATSAPP_TEMPLATE_LANGUAGE || whatsappFileConfig?.templateLanguage || "en_US";
-const WHATSAPP_TEMPLATE_FALLBACK_NAME =
-  process.env.WHATSAPP_TEMPLATE_FALLBACK_NAME || whatsappFileConfig?.templateFallbackName || "hello_world";
-const WHATSAPP_TEMPLATE_FALLBACK_LANGUAGE =
-  process.env.WHATSAPP_TEMPLATE_FALLBACK_LANGUAGE ||
-  whatsappFileConfig?.templateFallbackLanguage ||
-  "en_US";
-const WHATSAPP_TEMPLATE_PARAM_MODE =
-  process.env.WHATSAPP_TEMPLATE_PARAM_MODE || whatsappFileConfig?.templateParamMode || "none";
-const WHATSAPP_ENVELOPE_IMAGE_MODE =
-  process.env.WHATSAPP_ENVELOPE_IMAGE_MODE || whatsappFileConfig?.envelopeImageMode || "none";
-const WHATSAPP_ENVELOPE_IMAGE_URL =
-  process.env.WHATSAPP_ENVELOPE_IMAGE_URL || whatsappFileConfig?.envelopeImageUrl || "";
-const WHATSAPP_ENVELOPE_IMAGE_CAPTION =
-  process.env.WHATSAPP_ENVELOPE_IMAGE_CAPTION ||
-  whatsappFileConfig?.envelopeImageCaption ||
-  "Ouvrir l'invitation avec le lien RSVP.";
-const WHATSAPP_AUTO_ENABLED = Boolean(WHATSAPP_ACCESS_TOKEN && WHATSAPP_PHONE_NUMBER_ID);
-
-const EVENT_TYPES = [
-  { value: "mariage", label: "Mariage", invitePhrase: "vous invitent a leur mariage" },
-  { value: "conference", label: "Conference", invitePhrase: "vous invitent a leur conference" },
-  { value: "concert", label: "Concert", invitePhrase: "vous invitent a leur concert" },
-  { value: "campagne", label: "Campagne", invitePhrase: "vous invitent a leur campagne" },
-  { value: "anniversaire", label: "Anniversaire", invitePhrase: "vous invitent a leur anniversaire" },
-  { value: "seminaire", label: "Seminaire", invitePhrase: "vous invitent a leur seminaire" },
-  { value: "ceremonie", label: "Ceremonie", invitePhrase: "vous invitent a leur ceremonie" },
-  { value: "autre", label: "Autre", invitePhrase: "vous invitent a leur evenement" }
-];
-
-function sanitizeEventType(value) {
-  const normalized = String(value || "").trim().toLowerCase();
-  return EVENT_TYPES.some((item) => item.value === normalized) ? normalized : "mariage";
-}
-
-function getEventTypeMeta(value) {
-  const eventType = sanitizeEventType(value);
-  return EVENT_TYPES.find((item) => item.value === eventType) || EVENT_TYPES[0];
-}
-
 app.use(passport.initialize());
 app.use(passport.session());
-
-passport.serializeUser((user, done) => {
-  done(null, user.id);
-});
-
-passport.deserializeUser((id, done) => {
-  const user = db.prepare("SELECT id, full_name, email FROM users WHERE id = ?").get(id);
-  done(null, user || false);
-});
-
-if (GOOGLE_OAUTH_ENABLED) {
-  passport.use(
-    new GoogleStrategy(
-      {
-        clientID: GOOGLE_CLIENT_ID,
-        clientSecret: GOOGLE_CLIENT_SECRET,
-        callbackURL: GOOGLE_CALLBACK_URL
-      },
-      (_accessToken, _refreshToken, profile, done) => {
-        try {
-          const email = String(profile.emails?.[0]?.value || "").trim().toLowerCase();
-          const googleId = String(profile.id || "").trim();
-          const fullName = String(profile.displayName || email || "Utilisateur Google").trim();
-
-          if (!email || !googleId) {
-            return done(null, false);
-          }
-
-          const userByGoogleId = db
-            .prepare("SELECT id, full_name, email FROM users WHERE google_id = ?")
-            .get(googleId);
-          if (userByGoogleId) return done(null, userByGoogleId);
-
-          const userByEmail = db
-            .prepare("SELECT id, full_name, email, google_id FROM users WHERE email = ?")
-            .get(email);
-          if (userByEmail) {
-            if (!userByEmail.google_id) {
-              db.prepare("UPDATE users SET google_id = ? WHERE id = ?").run(googleId, userByEmail.id);
-            }
-            return done(null, {
-              id: userByEmail.id,
-              full_name: userByEmail.full_name,
-              email: userByEmail.email
-            });
-          }
-
-          const info = db
-            .prepare("INSERT INTO users (full_name, email, password_hash, google_id) VALUES (?, ?, ?, ?)")
-            .run(fullName, email, hashPassword(randomToken(24)), googleId);
-
-          return done(null, { id: info.lastInsertRowid, full_name: fullName, email });
-        } catch (error) {
-          return done(error);
-        }
-      }
-    )
-  );
-}
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname || "").toLowerCase();
-    cb(null, `${Date.now()}-${randomToken(8)}${ext}`);
-  }
-});
-
-const upload = multer({
-  storage,
-  fileFilter: (_req, file, cb) => {
-    const allowed = ["image/jpeg", "image/png", "image/webp"];
-    cb(null, allowed.includes(file.mimetype));
-  },
-  limits: { fileSize: 5 * 1024 * 1024 }
-});
-
-function randomToken(bytes = 16) {
-  return crypto.randomBytes(bytes).toString("hex");
-}
-
-function normalizePhone(raw) {
-  return String(raw || "").replace(/\D/g, "");
-}
-
-function extractPhoneFromText(raw) {
-  const text = String(raw || "");
-  const match = text.match(/(?:\+?\d[\d\s().-]{6,}\d)/);
-  if (!match) return null;
-  const normalized = normalizePhone(match[0]);
-  if (normalized.length < 8) return null;
-  return {
-    phone: normalized,
-    strippedText: text.replace(match[0], " ").replace(/\s+/g, " ").trim()
-  };
-}
-
-function hashPassword(password) {
-  const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
-  return `${salt}:${hash}`;
-}
-
-function verifyPassword(password, stored) {
-  const [salt, hash] = String(stored || "").split(":");
-  if (!salt || !hash) return false;
-  const testHash = crypto.scryptSync(password, salt, 64).toString("hex");
-  const a = Buffer.from(hash, "hex");
-  const b = Buffer.from(testHash, "hex");
-  if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(a, b);
-}
-
-function baseUrl(req) {
-  if (process.env.APP_BASE_URL) return process.env.APP_BASE_URL.replace(/\/$/, "");
-  return `${req.protocol}://${req.get("host")}`;
-}
 
 function appendWhatsAppLogLine(line) {
   try {
@@ -349,6 +106,28 @@ function appendWhatsAppLogLine(line) {
 function requireAuth(req, res, next) {
   if (!req.session.userId) return res.redirect("/connexion");
   return next();
+}
+
+function getDashboardInvitations(userId) {
+  return db
+    .prepare(`
+      SELECT
+        i.id,
+        i.event_type,
+        i.couple_names,
+        i.event_date,
+        i.venue,
+        i.created_at,
+        COUNT(g.id) AS guest_count,
+        SUM(CASE WHEN g.rsvp_status = 'yes' THEN 1 ELSE 0 END) AS yes_count,
+        SUM(CASE WHEN g.rsvp_status = 'no' THEN 1 ELSE 0 END) AS no_count
+      FROM invitations i
+      LEFT JOIN guests g ON g.invitation_id = i.id
+      WHERE i.owner_user_id = ?
+      GROUP BY i.id
+      ORDER BY i.created_at DESC
+    `)
+    .all(userId);
 }
 
 app.use((req, res, next) => {
@@ -425,277 +204,104 @@ app.post("/connexion", (req, res) => {
   return res.redirect("/tableau-de-bord");
 });
 
-app.get("/auth/google", (req, res, next) => {
-  if (!GOOGLE_OAUTH_ENABLED) {
-    return res.redirect("/connexion?error=Connexion+Google+non+configuree+sur+le+serveur.");
-  }
-  return passport.authenticate("google", { scope: ["profile", "email"], prompt: "select_account" })(
-    req,
-    res,
-    next
-  );
-});
+if (GOOGLE_OAUTH_ENABLED) {
+  passport.serializeUser((user, done) => {
+    done(null, user.id);
+  });
 
-app.get("/auth/google/callback", (req, res, next) => {
-  if (!GOOGLE_OAUTH_ENABLED) {
-    return res.redirect("/connexion?error=Connexion+Google+non+configuree+sur+le+serveur.");
-  }
-  return passport.authenticate("google", { failureRedirect: "/connexion?error=Connexion+Google+echouee." })(
-    req,
-    res,
-    () => {
-      req.session.userId = req.user.id;
-      return res.redirect("/tableau-de-bord");
-    }
+  passport.deserializeUser((id, done) => {
+    const user = db.prepare("SELECT id, full_name, email FROM users WHERE id = ?").get(id);
+    done(null, user || false);
+  });
+
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: GOOGLE_CLIENT_ID,
+        clientSecret: GOOGLE_CLIENT_SECRET,
+        callbackURL: GOOGLE_CALLBACK_URL
+      },
+      (_accessToken, _refreshToken, profile, done) => {
+        try {
+          const email = String(profile.emails?.[0]?.value || "").trim().toLowerCase();
+          const googleId = String(profile.id || "").trim();
+          const fullName = String(profile.displayName || email || "Utilisateur Google").trim();
+
+          if (!email || !googleId) {
+            return done(null, false);
+          }
+
+          const userByGoogleId = db
+            .prepare("SELECT id, full_name, email FROM users WHERE google_id = ?")
+            .get(googleId);
+          if (userByGoogleId) return done(null, userByGoogleId);
+
+          const userByEmail = db
+            .prepare("SELECT id, full_name, email, google_id FROM users WHERE email = ?")
+            .get(email);
+          if (userByEmail) {
+            if (!userByEmail.google_id) {
+              db.prepare("UPDATE users SET google_id = ? WHERE id = ?").run(googleId, userByEmail.id);
+            }
+            return done(null, {
+              id: userByEmail.id,
+              full_name: userByEmail.full_name,
+              email: userByEmail.email
+            });
+          }
+
+          const info = db
+            .prepare("INSERT INTO users (full_name, email, password_hash, google_id) VALUES (?, ?, ?, ?)")
+            .run(fullName, email, hashPassword(randomToken(24)), googleId);
+
+          return done(null, { id: info.lastInsertRowid, full_name: fullName, email });
+        } catch (error) {
+          return done(error);
+        }
+      }
+    )
   );
-});
+
+  app.get("/auth/google", (req, res, next) => {
+    return passport.authenticate("google", { scope: ["profile", "email"], prompt: "select_account" })(
+      req,
+      res,
+      next
+    );
+  });
+
+  app.get("/auth/google/callback", (req, res, next) => {
+    return passport.authenticate("google", { failureRedirect: "/connexion?error=Connexion+Google+echouee." })(
+      req,
+      res,
+      () => {
+        req.session.userId = req.user.id;
+        return res.redirect("/tableau-de-bord");
+      }
+    );
+  });
+}
 
 app.post("/deconnexion", (req, res) => {
   req.session.destroy(() => res.redirect("/accueil.html"));
 });
 
-function parseGuests(rawText) {
-  return String(rawText || "")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      let fullName = line;
-      let phone = null;
-
-      if (line.includes("|")) {
-        const [namePart, phonePart = ""] = line.split("|");
-        fullName = String(namePart || "").trim();
-        const normalized = normalizePhone(phonePart);
-        phone = normalized.length >= 8 ? normalized : null;
-      } else {
-        const extracted = extractPhoneFromText(line);
-        if (extracted) {
-          fullName = extracted.strippedText;
-          phone = extracted.phone;
-        }
-      }
-
-      fullName = String(fullName || "").replace(/[-,;]+$/, "").trim();
-      if (!fullName) return null;
-      return { fullName, phone };
-    })
-    .filter(Boolean);
-}
-
-function repairGuestsPhoneData() {
-  const rows = db
-    .prepare("SELECT id, full_name, phone FROM guests WHERE phone IS NULL OR TRIM(phone) = ''")
-    .all();
-  const updateStmt = db.prepare("UPDATE guests SET full_name = ?, phone = ? WHERE id = ?");
-
-  for (const row of rows) {
-    const extracted = extractPhoneFromText(row.full_name);
-    if (!extracted || !extracted.phone || !extracted.strippedText) continue;
-    updateStmt.run(extracted.strippedText, extracted.phone, row.id);
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || "").toLowerCase();
+    cb(null, `${Date.now()}-${randomToken(8)}${ext}`);
   }
-}
+});
 
-repairGuestsPhoneData();
-
-async function sendWhatsAppTextMessage(to, bodyText) {
-  if (!WHATSAPP_AUTO_ENABLED) return { ok: false, reason: "not_configured" };
-  const endpoint = `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
-
-  try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to,
-        type: "text",
-        text: {
-          preview_url: true,
-          body: bodyText
-        }
-      })
-    });
-
-    if (!response.ok) {
-      let reason = `HTTP ${response.status}`;
-      let metaCode = null;
-      let metaSubcode = null;
-      let metaMessage = "";
-      try {
-        const payload = await response.json();
-        metaMessage = payload?.error?.message || "";
-        metaCode = payload?.error?.code || null;
-        metaSubcode = payload?.error?.error_subcode || null;
-        reason = `HTTP ${response.status}${metaCode ? ` code ${metaCode}` : ""}${
-          metaSubcode ? `/${metaSubcode}` : ""
-        }${metaMessage ? `: ${metaMessage}` : ""}`;
-      } catch {
-        const detail = await response.text();
-        if (detail) reason = `${reason}: ${detail}`;
-      }
-      return { ok: false, reason, metaCode, metaSubcode, metaMessage };
-    }
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, reason: String(error?.message || error), metaCode: null, metaSubcode: null };
-  }
-}
-
-async function sendWhatsAppTemplateMessage(to, templateName, languageCode, bodyParams = [], options = {}) {
-  if (!WHATSAPP_AUTO_ENABLED) return { ok: false, reason: "not_configured" };
-  const endpoint = `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
-
-  const components = [];
-  const headerImageLink = String(options.headerImageLink || "").trim();
-
-  if (headerImageLink) {
-    components.push({
-      type: "header",
-      parameters: [
-        {
-          type: "image",
-          image: { link: headerImageLink }
-        }
-      ]
-    });
-  }
-
-  if (bodyParams.length > 0) {
-    components.push({
-      type: "body",
-      parameters: bodyParams.map((value) => ({ type: "text", text: String(value) }))
-    });
-  }
-
-  try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to,
-        type: "template",
-        template: {
-          name: templateName,
-          language: { code: languageCode },
-          ...(components.length ? { components } : {})
-        }
-      })
-    });
-
-    if (!response.ok) {
-      let reason = `HTTP ${response.status}`;
-      let metaCode = null;
-      let metaSubcode = null;
-      let metaMessage = "";
-      try {
-        const payload = await response.json();
-        metaMessage = payload?.error?.message || "";
-        metaCode = payload?.error?.code || null;
-        metaSubcode = payload?.error?.error_subcode || null;
-        reason = `HTTP ${response.status}${metaCode ? ` code ${metaCode}` : ""}${
-          metaSubcode ? `/${metaSubcode}` : ""
-        }${metaMessage ? `: ${metaMessage}` : ""}`;
-      } catch {
-        const detail = await response.text();
-        if (detail) reason = `${reason}: ${detail}`;
-      }
-      return { ok: false, reason, metaCode, metaSubcode, metaMessage };
-    }
-
-    const payload = await response.json();
-    return { ok: true, payload };
-  } catch (error) {
-    return { ok: false, reason: String(error?.message || error), metaCode: null, metaSubcode: null };
-  }
-}
-
-async function sendWhatsAppImageMessage(to, imageUrl, caption = "") {
-  if (!WHATSAPP_AUTO_ENABLED) return { ok: false, reason: "not_configured" };
-  const endpoint = `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
-  try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to,
-        type: "image",
-        image: {
-          link: imageUrl,
-          ...(caption ? { caption } : {})
-        }
-      })
-    });
-
-    if (!response.ok) {
-      const payload = await response.text();
-      return { ok: false, reason: `HTTP ${response.status}: ${payload}` };
-    }
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, reason: String(error?.message || error) };
-  }
-}
-
-function isPublicHttpsUrl(value) {
-  try {
-    const parsed = new URL(String(value || ""));
-    if (parsed.protocol !== "https:") return false;
-    const host = parsed.hostname.toLowerCase();
-    return !["localhost", "127.0.0.1", "::1"].includes(host);
-  } catch {
-    return false;
-  }
-}
-
-function buildEnvelopeMessage({ guestName, coupleNames, eventType, eventDate, venue, rsvpUrl }) {
-  const typeMeta = getEventTypeMeta(eventType);
-  return [
-    `Bonjour ${guestName},`,
-    "",
-    `${coupleNames} ${typeMeta.invitePhrase}.`,
-    `Date: ${eventDate}`,
-    `Lieu: ${venue}`,
-    "",
-    "Ouvrez l'enveloppe et confirmez votre presence ici:",
-    rsvpUrl
-  ].join("\n");
-}
-
-function getDashboardInvitations(userId) {
-  const rows = db
-    .prepare(`
-      SELECT
-        i.id,
-        i.event_type,
-        i.couple_names,
-        i.event_date,
-        i.venue,
-        i.created_at,
-        COUNT(g.id) AS guest_count,
-        SUM(CASE WHEN g.rsvp_status = 'yes' THEN 1 ELSE 0 END) AS yes_count,
-        SUM(CASE WHEN g.rsvp_status = 'no' THEN 1 ELSE 0 END) AS no_count
-      FROM invitations i
-      LEFT JOIN guests g ON g.invitation_id = i.id
-      WHERE i.owner_user_id = ?
-      GROUP BY i.id
-      ORDER BY i.created_at DESC
-    `)
-    .all(userId);
-
-  return rows;
-}
+const upload = multer({
+  storage,
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    cb(null, allowed.includes(file.mimetype));
+  },
+  limits: { fileSize: 5 * 1024 * 1024 }
+});
 
 app.get("/tableau-de-bord", requireAuth, (req, res) => {
   return res.render("dashboard", {
@@ -796,7 +402,6 @@ app.post("/tableau-de-bord/nouvelle-invitation", requireAuth, upload.single("ima
   let failedCount = 0;
   let skippedCount = 0;
   const failedReasons = [];
-  const failedMetaCodes = [];
   let imageSkippedCount = 0;
   const dispatchReports = [];
   const dispatchStartedAt = new Date().toISOString();
@@ -914,6 +519,7 @@ app.post("/tableau-de-bord/nouvelle-invitation", requireAuth, upload.single("ima
         templateUsed = "text_message";
       }
     }
+
     if (result.ok) {
       sentCount += 1;
       let imageStatus = "not_requested";
@@ -960,7 +566,6 @@ app.post("/tableau-de-bord/nouvelle-invitation", requireAuth, upload.single("ima
     } else {
       failedCount += 1;
       if (result.reason) failedReasons.push(result.reason);
-      if (result.metaCode) failedMetaCodes.push(result.metaCode);
       dispatchReports.push({
         guestName: guest.fullName,
         phone: guest.phone,
@@ -1012,7 +617,7 @@ app.post("/tableau-de-bord/nouvelle-invitation", requireAuth, upload.single("ima
     if (failedGuests.length) {
       warnings.push(`Numeros en echec: ${failedGuests.join(" ; ")}`);
     }
-    if (failedMetaCodes.includes(133010)) {
+    if (failedReasons.some((reason) => reason.includes("133010"))) {
       warnings.push(
         "Meta: compte non enregistre (133010). Verifiez dans Meta > WhatsApp > API Setup que le numero emetteur est bien enregistre/actif, et en mode test ajoutez votre numero destinataire dans la liste des destinataires autorises."
       );
