@@ -150,6 +150,10 @@ app.get(["/accueil", "/accueil.html"], (_req, res) => {
   return res.sendFile(path.join(ROOT, "accueil.html"));
 });
 
+app.get(["/invitation-mariage", "/invitation-mariage.html"], (_req, res) => {
+  return res.sendFile(path.join(ROOT, "invitation-mariage.html"));
+});
+
 app.get("/index.html", (_req, res) => {
   return res.sendFile(path.join(ROOT, "index.html"));
 });
