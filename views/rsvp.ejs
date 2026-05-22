@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <%- include("partials/head", { title: ogTitle, description: ogDescription }) %>
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="fr_FR">
+  <meta property="og:title" content="<%= ogTitle %>">
+  <meta property="og:description" content="<%= ogDescription %>">
+  <meta property="og:url" content="<%= pageUrl %>">
+  <meta property="og:image" content="<%= imageUrl %>">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="<%= ogTitle %>">
+  <meta name="twitter:description" content="<%= ogDescription %>">
+  <meta name="twitter:image" content="<%= imageUrl %>">
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 14px;
+      background:
+        radial-gradient(circle at 10% 0%, rgba(61, 118, 228, 0.22), transparent 40%),
+        radial-gradient(circle at 90% 0%, rgba(228, 76, 154, 0.14), transparent 35%),
+        radial-gradient(circle at 50% 100%, rgba(122, 174, 255, 0.22), transparent 38%),
+        #eef3ff;
+      font-family: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+      color: #162447;
+    }
+    .scene {
+      width: min(680px, 98vw);
+      aspect-ratio: 11 / 16;
+      border-radius: 34px;
+      overflow: hidden;
+      position: relative;
+      border: 1px solid #d8def1;
+      background:
+        radial-gradient(circle at 50% -20%, rgba(118, 168, 255, 0.32), transparent 60%),
+        linear-gradient(160deg, #f5f7ff 0%, #ebf0ff 100%);
+      box-shadow: 0 40px 68px rgba(17, 34, 86, 0.24);
+    }
+    .open-toggle {
+      position: absolute;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      z-index: 20;
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: #fff;
+      background: linear-gradient(140deg, #0455bf, #307ce4);
+      box-shadow: 0 12px 24px rgba(15, 46, 123, 0.28);
+      cursor: pointer;
+    }
+    .envelope-wrap {
+      position: absolute;
+      left: 50%;
+      bottom: 10%;
+      width: 94%;
+      transform: translateX(-50%);
+      perspective: 1200px;
+    }
+    .envelope {
+      position: relative;
+      width: 100%;
+      height: 450px;
+      overflow: hidden;
+      border-radius: 16px;
+      transform-style: preserve-3d;
+    }
+    .env-back,
+    .env-front,
+    .env-flap {
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgba(133, 154, 206, 0.5);
+      border-radius: 12px;
+      background: linear-gradient(160deg, #ffffff, #eef3ff);
+    }
+    .env-front {
+      clip-path: polygon(0 18%, 50% 58%, 100% 18%, 100% 100%, 0 100%);
+      z-index: 4;
+    }
+    .env-flap {
+      z-index: 5;
+      transform-origin: top center;
+      clip-path: polygon(0 0, 100% 0, 50% 62%);
+      background: linear-gradient(180deg, #ffffff, #e4ecff);
+      transition: transform 1.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+      backface-visibility: hidden;
+    }
+    .seal {
+      position: absolute;
+      left: 50%;
+      top: 54%;
+      transform: translate(-50%, -50%);
+      width: 86px;
+      height: 86px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-weight: 800;
+      background: linear-gradient(140deg, #0455bf, #307ce4);
+      z-index: 6;
+      transition: opacity 0.35s ease;
+      animation: sealFloat 2.8s ease-in-out infinite;
+    }
+    @keyframes sealFloat {
+      0%, 100% { transform: translate(-50%, -50%) translateY(0); }
+      50% { transform: translate(-50%, -50%) translateY(-5px); }
+    }
+    .invitation {
+      position: absolute;
+      left: 50%;
+      bottom: 16px;
+      width: 90%;
+      transform: translateX(-50%) translateY(118%);
+      transition: transform 1.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+      border-radius: 24px;
+      border: 1px solid #d6dff8;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 251, 255, 0.98)),
+        #ffffff;
+      padding: 28px 24px;
+      box-shadow: 0 28px 46px rgba(15, 39, 101, 0.24);
+      z-index: 2;
+      max-height: 75vh;
+      overflow-y: auto;
+    }
+    .invitation h1 {
+      margin: 0 0 14px;
+      font-size: clamp(2rem, 4.6vw, 2.9rem);
+      line-height: 1.2;
+      letter-spacing: -0.6px;
+    }
+    .invitation p {
+      margin: 9px 0;
+      color: #364970;
+      font-size: 1.22rem;
+      line-height: 1.45;
+    }
+    .card-image {
+      width: 100%;
+      max-height: 360px;
+      object-fit: cover;
+      border-radius: 14px;
+      border: 1px solid #d6dff8;
+      margin: 8px 0 12px;
+    }
+    .rsvp-actions {
+      margin-top: 18px;
+      display: grid;
+      gap: 10px;
+    }
+    .rsvp-actions button {
+      border: 0;
+      border-radius: 999px;
+      padding: 11px 12px;
+      font-weight: 700;
+      font-size: 1rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    .btn-icon {
+      font-size: 0.82rem;
+      line-height: 1;
+      transform: translateY(-0.5px);
+    }
+    .btn-yes {
+      color: #fff;
+      background: linear-gradient(140deg, #0b8f4b, #2bbf71);
+    }
+    .btn-no {
+      color: #fff;
+      background: linear-gradient(140deg, #bf3240, #ea5765);
+    }
+    .status {
+      margin-top: 10px;
+      font-size: 1.1rem;
+      color: #546890;
+    }
+    .scene.open .env-flap {
+      transform: rotateX(178deg);
+      z-index: 0;
+    }
+    .scene.open .seal {
+      opacity: 0;
+    }
+    .scene.open .envelope {
+      overflow: visible;
+    }
+    .scene.open .invitation {
+      transform: translateX(-50%) translateY(-50%);
+      z-index: 7;
+    }
+    .top-label {
+      position: absolute;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #4c5f86;
+      font-size: 1.3rem;
+      font-weight: 700;
+      text-align: center;
+      width: 92%;
+    }
+    .alert {
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 0.86rem;
+      font-weight: 700;
+      margin-top: 10px;
+    }
+    .alert.success {
+      background: #d7f5df;
+      color: #125929;
+    }
+    .flash-toast {
+      position: absolute;
+      top: 66px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(88%, 520px);
+      z-index: 30;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid #a6d9b8;
+      background: #d7f5df;
+      color: #125929;
+      font-weight: 700;
+      font-size: 0.9rem;
+      text-align: center;
+      opacity: 0;
+      transition: opacity 0.35s ease;
+      pointer-events: none;
+    }
+    .flash-toast.show {
+      opacity: 1;
+    }
+    @media (max-width: 760px) {
+      .scene {
+        width: min(560px, 97vw);
+      }
+      .envelope {
+        height: 380px;
+      }
+      .invitation {
+        width: 89%;
+        max-height: 68vh;
+      }
+    }
+    @media (max-width: 430px) {
+      .scene.open .invitation {
+        transform: translateX(-50%) translateY(-38%);
+      }
+      .invitation {
+        max-height: 62vh;
+        padding: 18px 14px;
+      }
+      .invitation p {
+        font-size: 1rem;
+      }
+      .rsvp-actions button {
+        font-size: 1.05rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="scene" id="scene">
+    <% if (success) { %>
+      <div class="flash-toast" id="successToast"><%= success %></div>
+    <% } %>
+    <div class="top-label">Invitation pour <strong><%= data.full_name %></strong></div>
+    <div class="envelope-wrap">
+      <div class="envelope">
+        <div class="env-back"></div>
+        <article class="invitation">
+          <h1><%= data.couple_names %></h1>
+          <p><strong>Type:</strong> <%= eventTypeLabel %></p>
+          <% if (data.image_path) { %>
+            <img class="card-image" src="<%= data.image_path %>" alt="Faire-part de l'invitation">
+          <% } %>
+          <p><strong>Date:</strong> <%= data.event_date %></p>
+          <p><strong>Lieu:</strong> <%= data.venue %></p>
+          <p><%= data.message %></p>
+          <p class="status">
+            Statut actuel:
+            <% if (data.rsvp_status === "yes") { %>Present<% } %>
+            <% if (data.rsvp_status === "no") { %>Absent<% } %>
+            <% if (data.rsvp_status === "pending") { %>En attente<% } %>
+          </p>
+          <form class="rsvp-actions" method="post" action="/rsvp/<%= token %>">
+            <button class="btn-yes" name="status" value="yes" type="submit"><span class="btn-icon">✅</span>Je serai present</button>
+            <button class="btn-no" name="status" value="no" type="submit"><span class="btn-icon">❌</span>Je ne serai pas present</button>
+          </form>
+        </article>
+        <div class="env-front"></div>
+        <div class="env-flap"></div>
+        <div class="seal">RSVP</div>
+      </div>
+    </div>
+    <button id="openToggle" class="open-toggle" type="button">Ouvrir l'invitation</button>
+  </main>
+
+  <script>
+    const scene = document.getElementById("scene");
+    const openToggle = document.getElementById("openToggle");
+    const successToast = document.getElementById("successToast");
+    let opened = false;
+
+    function renderEnvelopeState() {
+      if (!scene || !openToggle) return;
+      scene.classList.toggle("open", opened);
+      openToggle.textContent = opened ? "Fermer l'invitation" : "Ouvrir l'invitation";
+    }
+
+    if (openToggle) {
+      openToggle.addEventListener("click", () => {
+        opened = !opened;
+        renderEnvelopeState();
+      });
+    }
+
+    <% if (success) { %>
+      opened = true;
+      renderEnvelopeState();
+      if (successToast) successToast.classList.add("show");
+      setTimeout(() => {
+        opened = false;
+        renderEnvelopeState();
+      }, 1100);
+      setTimeout(() => {
+        if (successToast) successToast.classList.remove("show");
+      }, 2700);
+    <% } %>
+
+    renderEnvelopeState();
+  </script>
+  <script src="/js/theme.js"></script>
+</body>
+</html>

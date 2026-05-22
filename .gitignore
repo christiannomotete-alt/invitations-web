@@ -1,0 +1,4 @@
+node_modules/
+data/
+google-oauth-client.json
+whatsapp-config.json

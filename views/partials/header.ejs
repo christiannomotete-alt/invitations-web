@@ -1,0 +1,28 @@
+<header class="site-header">
+  <a class="brand" href="<%= currentUser ? '/tableau-de-bord' : '/connexion' %>">
+    <span class="brand-badge">RSVP</span>
+    <span>Invitation Mariage</span>
+  </a>
+  <div class="header-actions">
+    <button id="themeToggle" class="ghost-btn" type="button">Mode sombre / clair</button>
+    <% if (currentUser) { %>
+      <div class="profile-menu" id="profileMenu">
+        <button class="profile-toggle" id="profileToggle" type="button" aria-label="Ouvrir menu compte">
+          <span class="profile-avatar"><%= (currentUser.full_name || "U").trim().charAt(0).toUpperCase() %></span>
+        </button>
+        <div class="profile-dropdown" id="profileDropdown">
+          <p class="profile-email">Email: <strong><%= currentUser.email %></strong></p>
+          <form action="/tableau-de-bord/historique/supprimer" method="post" onsubmit="return confirm('Supprimer tout l\'historique des invitations ?');">
+            <button class="menu-action danger-action" type="submit">Supprimer l'historique</button>
+          </form>
+          <button class="menu-action" id="showPasswordOption" type="button">
+            Voir votre mot de passe
+          </button>
+          <form action="/deconnexion" method="post">
+            <button class="menu-action" type="submit">Deconnexion</button>
+          </form>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</header>

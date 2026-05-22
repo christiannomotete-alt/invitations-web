@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <%- include("partials/head", { title: "Nouvelle invitation", description: "Creation d'une invitation unique" }) %>
+</head>
+<body>
+  <div class="page-wrap">
+    <%- include("partials/header", { currentUser }) %>
+    <main class="content">
+      <section class="hero-card">
+        <div>
+          <h1>Creation d'invitation</h1>
+          <p class="muted">Chaque invitation cree un lien unique et un systeme RSVP reel.</p>
+        </div>
+        <a class="ghost-btn" href="/tableau-de-bord">Retour dashboard</a>
+      </section>
+
+      <% if (error) { %><p class="alert error"><%= error %></p><% } %>
+
+      <form class="panel stack" action="<%= action %>" method="post" enctype="multipart/form-data">
+        <label>Type d'invitation
+          <select name="eventType" required>
+            <option value="" <%= !selectedEventType ? "selected" : "" %> disabled>Choisir un type</option>
+            <% eventTypes.forEach((type) => { %>
+              <option value="<%= type.value %>" <%= selectedEventType === type.value ? "selected" : "" %>><%= type.label %></option>
+            <% }) %>
+          </select>
+        </label>
+        <label>Nom de l'evenement / organisateur
+          <input name="coupleNames" type="text" required>
+        </label>
+        <label>Date de l'evenement
+          <input name="eventDate" type="text" required>
+        </label>
+        <label>Lieu
+          <input name="venue" type="text" required>
+        </label>
+        <label>Message
+          <textarea name="message" rows="4" required></textarea>
+        </label>
+        <label>Image de couverture (preview WhatsApp)
+          <input name="image" type="file" accept="image/png,image/jpeg,image/webp">
+        </label>
+        <label>Titre Open Graph personnalise
+          <input name="ogTitle" type="text">
+        </label>
+        <label>Description Open Graph personnalisee
+          <textarea name="ogDescription" rows="3"></textarea>
+        </label>
+        <label>Liste invites (1 par ligne: Nom|Numero ou Nom +Numero)
+          <textarea name="guests" rows="8"></textarea>
+        </label>
+        <button class="primary-btn" type="submit">Creer l'invitation</button>
+      </form>
+    </main>
+  </div>
+  <script src="/js/theme.js"></script>
+</body>
+</html>

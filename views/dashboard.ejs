@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <%- include("partials/head", { title: "Tableau de bord", description: "Gestion des invitations et confirmations" }) %>
+</head>
+<body>
+  <div class="page-wrap">
+    <%- include("partials/header", { currentUser }) %>
+    <main class="content">
+      <section class="hero-card">
+        <div>
+          <h1>Tableau de bord</h1>
+          <p class="muted">Creez vos invitations uniques, partagez-les sur WhatsApp et suivez les confirmations en temps reel.</p>
+        </div>
+        <div class="actions-inline">
+          <a class="primary-btn" href="/tableau-de-bord/nouvelle-invitation">Nouvelle invitation</a>
+          <% if (invitations.length) { %>
+            <form action="/tableau-de-bord/historique/supprimer" method="post" onsubmit="return confirm('Supprimer tout l\'historique des invitations ?');">
+              <button class="danger-btn" type="submit">Supprimer l'historique</button>
+            </form>
+          <% } %>
+        </div>
+      </section>
+
+      <% if (success) { %><p class="alert success"><%= success %></p><% } %>
+      <% if (error) { %><p class="alert error"><%= error %></p><% } %>
+
+      <section class="grid cards">
+        <% if (!invitations.length) { %>
+          <article class="panel">
+            <h3>Aucune invitation</h3>
+            <p class="muted">Commencez par creer votre premiere invitation.</p>
+          </article>
+        <% } %>
+
+        <% invitations.forEach((item) => { %>
+          <% const typeMeta = eventTypes.find((t) => t.value === item.event_type) || eventTypes[0]; %>
+          <article class="panel">
+            <h3><%= item.couple_names %></h3>
+            <p><strong>Type:</strong> <%= typeMeta.label %></p>
+            <p><strong>Date:</strong> <%= item.event_date %></p>
+            <p><strong>Lieu:</strong> <%= item.venue %></p>
+            <p class="tiny">ID unique: <code><%= item.id %></code></p>
+            <div class="stats">
+              <span>Total invites: <strong><%= item.guest_count || 0 %></strong></span>
+              <span>Confirmes: <strong><%= item.yes_count || 0 %></strong></span>
+              <span>Absents: <strong><%= item.no_count || 0 %></strong></span>
+            </div>
+            <div class="actions-inline">
+              <a class="ghost-btn" href="/tableau-de-bord/invitation/<%= item.id %>">Gerer</a>
+              <form action="/tableau-de-bord/invitation/<%= item.id %>/supprimer" method="post" onsubmit="return confirm('Supprimer cette invitation ?');">
+                <button class="danger-btn" type="submit">Supprimer</button>
+              </form>
+            </div>
+          </article>
+        <% }) %>
+      </section>
+    </main>
+  </div>
+  <script src="/js/theme.js"></script>
+</body>
+</html>

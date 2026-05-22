@@ -1,0 +1,743 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invitation Mariage - Amina & Daniel</title>
+  <meta name="description" content="Invitation de mariage digitale elegante avec enveloppe animee et RSVP.">
+  <link rel="canonical" href="https://eventscape.tg/invitation/invitation-mariage.html">
+
+  <meta property="og:locale" content="fr_FR">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Eventscape">
+  <meta property="og:title" content="✨ Invitation Mariage - Amina & Daniel">
+  <meta property="og:description" content="Avec la benediction de nos familles, nous avons la joie de vous inviter a celebrer notre union. 15 Aout 2026 - Hotel Royal Palace, Lome.">
+  <meta property="og:url" content="https://eventscape.tg/invitation/invitation-mariage.html">
+  <meta property="og:image" content="https://eventscape.tg/assets/og/invitation-mariage-og.jpg">
+  <meta property="og:image:secure_url" content="https://eventscape.tg/assets/og/invitation-mariage-og.jpg">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Enveloppe elegante ivoire avec sceau dore et invitation de mariage Amina et Daniel">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="✨ Invitation Mariage - Amina & Daniel">
+  <meta name="twitter:description" content="Invitation officielle - 15 Aout 2026, Hotel Royal Palace, Lome. Confirmez votre presence.">
+  <meta name="twitter:image" content="https://eventscape.tg/assets/og/invitation-mariage-og.jpg">
+  <style>
+    :root {
+      --ivory: #f8f3e8;
+      --ivory-2: #f3ebdc;
+      --gold: #caa44f;
+      --ink: #2f2a24;
+      --rose: #a65473;
+      --line: rgba(202, 164, 79, 0.4);
+      --card-shadow: 0 22px 44px rgba(67, 48, 25, 0.22);
+      --panel-bg: rgba(255, 251, 242, 0.94);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 15% 0%, rgba(239, 220, 168, 0.38), transparent 40%),
+        radial-gradient(circle at 80% 10%, rgba(166, 84, 115, 0.16), transparent 35%),
+        linear-gradient(180deg, #fdfaf3, #f6efe2 65%, #f7f0e5);
+      display: grid;
+      place-items: center;
+      padding: 14px;
+      overflow-x: hidden;
+    }
+    .scene {
+      width: min(430px, 96vw);
+      aspect-ratio: 9 / 16;
+      position: relative;
+      border-radius: 26px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% -15%, rgba(202, 164, 79, 0.24), transparent 60%),
+        linear-gradient(170deg, #f9f3e9 0%, #f1e4cf 100%);
+      box-shadow: 0 30px 52px rgba(54, 35, 14, 0.2);
+      border: 1px solid rgba(202, 164, 79, 0.24);
+    }
+    .light {
+      position: absolute;
+      inset: -50% -20% auto -20%;
+      height: 70%;
+      background: radial-gradient(circle, rgba(255, 229, 160, 0.28), transparent 65%);
+      animation: glow 4.2s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes glow {
+      0%, 100% { opacity: 0.46; transform: scale(1); }
+      50% { opacity: 0.9; transform: scale(1.08); }
+    }
+    .sparkles {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .sparkles span {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #ffeec2;
+      box-shadow: 0 0 12px #ffebb4;
+      animation: twinkle 2.8s ease-in-out infinite;
+      opacity: 0.35;
+    }
+    .sparkles span:nth-child(1) { left: 16%; top: 20%; animation-delay: 0.2s; }
+    .sparkles span:nth-child(2) { left: 72%; top: 17%; animation-delay: 0.6s; }
+    .sparkles span:nth-child(3) { left: 62%; top: 32%; animation-delay: 1.2s; }
+    .sparkles span:nth-child(4) { left: 28%; top: 36%; animation-delay: 1.8s; }
+    .sparkles span:nth-child(5) { left: 83%; top: 44%; animation-delay: 2.2s; }
+    @keyframes twinkle {
+      0%, 100% { transform: scale(0.55); opacity: 0.28; }
+      50% { transform: scale(1.35); opacity: 1; }
+    }
+    .petals {
+      pointer-events: none;
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+    .petal {
+      position: absolute;
+      top: -14%;
+      width: 14px;
+      height: 22px;
+      border-radius: 14px 14px 14px 0;
+      background: linear-gradient(130deg, #f6bdd8, #d4709e);
+      opacity: 0.72;
+      animation: fall linear infinite;
+    }
+    .petal:nth-child(1) { left: 10%; animation-duration: 9s; animation-delay: -2s; }
+    .petal:nth-child(2) { left: 30%; animation-duration: 7.5s; animation-delay: -1s; }
+    .petal:nth-child(3) { left: 52%; animation-duration: 10s; animation-delay: -3s; }
+    .petal:nth-child(4) { left: 74%; animation-duration: 8.6s; animation-delay: -2.6s; }
+    .petal:nth-child(5) { left: 88%; animation-duration: 11s; animation-delay: -4.1s; }
+    @keyframes fall {
+      0% { transform: translateY(-12%) rotate(0deg); opacity: 0; }
+      12% { opacity: 0.78; }
+      100% { transform: translateY(118vh) rotate(315deg); opacity: 0; }
+    }
+    .top-actions {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      justify-content: space-between;
+      z-index: 18;
+      gap: 8px;
+    }
+    .link-btn,
+    .panel-btn {
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 700;
+      color: #7a5c28;
+      background: rgba(255, 251, 242, 0.9);
+      border: 1px solid rgba(202, 164, 79, 0.5);
+      border-radius: 999px;
+      padding: 7px 11px;
+      backdrop-filter: blur(3px);
+    }
+    .panel-btn {
+      cursor: pointer;
+      margin-left: auto;
+    }
+
+    .editor {
+      position: absolute;
+      top: 48px;
+      right: 12px;
+      width: min(92vw, 300px);
+      max-height: 72%;
+      overflow: auto;
+      border-radius: 14px;
+      border: 1px solid rgba(202, 164, 79, 0.45);
+      background: var(--panel-bg);
+      box-shadow: 0 16px 30px rgba(52, 39, 21, 0.2);
+      padding: 10px;
+      z-index: 20;
+      display: none;
+    }
+    .editor.open { display: block; }
+    .editor h3 {
+      margin: 2px 0 8px;
+      font-size: 14px;
+      color: #6a4f24;
+    }
+    .editor .group {
+      margin-bottom: 8px;
+      display: grid;
+      gap: 4px;
+    }
+    .editor label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #7c6340;
+    }
+    .editor input[type="text"],
+    .editor textarea {
+      width: 100%;
+      border: 1px solid rgba(202, 164, 79, 0.4);
+      border-radius: 9px;
+      padding: 8px;
+      font: inherit;
+      font-size: 12px;
+      background: #fffdf8;
+      color: #3b2e22;
+    }
+    .editor textarea { min-height: 64px; resize: vertical; }
+    .editor .mode-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: #644f31;
+    }
+    .editor .actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .small-btn {
+      border: 1px solid rgba(202, 164, 79, 0.5);
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #6b512b;
+      background: #fff9ee;
+      cursor: pointer;
+    }
+    .wa-output {
+      margin-top: 8px;
+      border: 1px dashed rgba(202, 164, 79, 0.55);
+      border-radius: 10px;
+      padding: 8px;
+      background: #fffdf8;
+      max-height: 120px;
+      overflow: auto;
+      display: grid;
+      gap: 6px;
+    }
+    .wa-output a {
+      font-size: 12px;
+      color: #5f4a2a;
+      text-decoration: none;
+      border: 1px solid rgba(202, 164, 79, 0.4);
+      border-radius: 999px;
+      padding: 6px 8px;
+      background: #fff8ec;
+    }
+    .wa-note {
+      margin-top: 6px;
+      font-size: 11px;
+      color: #8a734e;
+      line-height: 1.35;
+    }
+
+    .envelope-wrap {
+      position: absolute;
+      left: 50%;
+      bottom: 8%;
+      width: 90%;
+      max-width: 390px;
+      transform: translateX(-50%);
+      perspective: 1200px;
+      z-index: 3;
+    }
+    .envelope {
+      position: relative;
+      width: 100%;
+      height: 250px;
+      overflow: hidden;
+      border-radius: 12px;
+      transform-style: preserve-3d;
+    }
+    .env-back,
+    .env-front,
+    .env-flap {
+      position: absolute;
+      inset: 0;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: linear-gradient(160deg, var(--ivory), var(--ivory-2));
+      box-shadow: var(--card-shadow);
+    }
+    .env-back { z-index: 1; }
+    .env-front {
+      clip-path: polygon(0 18%, 50% 58%, 100% 18%, 100% 100%, 0 100%);
+      z-index: 4;
+    }
+    .env-flap {
+      transform-origin: top center;
+      clip-path: polygon(0 0, 100% 0, 50% 62%);
+      z-index: 5;
+      transition: transform 1.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+      background: linear-gradient(180deg, #fef8eb, #f0e2c7);
+      backface-visibility: hidden;
+    }
+    .seal {
+      position: absolute;
+      left: 50%;
+      top: 54%;
+      transform: translate(-50%, -50%);
+      width: 62px;
+      height: 62px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #f8d892, var(--gold));
+      border: 2px solid rgba(154, 116, 41, 0.55);
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      color: #fff8e8;
+      z-index: 6;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.34);
+      transition: opacity 0.4s ease;
+    }
+    .invitation {
+      position: absolute;
+      left: 50%;
+      bottom: 18px;
+      width: 84%;
+      transform: translateX(-50%) translateY(118%);
+      background: linear-gradient(180deg, #fffdfa 0%, #f9f0de 100%);
+      border: 1px solid rgba(202, 164, 79, 0.45);
+      border-radius: 16px;
+      padding: 24px 18px 20px;
+      box-shadow: 0 20px 34px rgba(53, 39, 22, 0.24);
+      transition: transform 1.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+      z-index: 2;
+    }
+    .invitation::before,
+    .invitation::after {
+      content: "";
+      position: absolute;
+      width: 92%;
+      height: 1px;
+      left: 4%;
+      background: linear-gradient(90deg, transparent, rgba(202, 164, 79, 0.75), transparent);
+    }
+    .invitation::before { top: 13px; }
+    .invitation::after { bottom: 13px; }
+    .hidden { display: none !important; }
+
+    .names {
+      text-align: center;
+      font-size: clamp(24px, 5.5vw, 34px);
+      line-height: 1.2;
+      color: var(--rose);
+      font-weight: 700;
+      font-family: "Brush Script MT", "Segoe Script", cursive;
+      margin: 2px 0 10px;
+    }
+    .intro {
+      text-align: center;
+      font-size: 13px;
+      line-height: 1.55;
+      color: #504236;
+      margin: 0 0 10px;
+    }
+    .details {
+      margin: 10px 0;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #3c3027;
+    }
+    .confirm {
+      margin: 10px 0 12px;
+      font-size: 12.8px;
+      line-height: 1.52;
+      color: #4f4032;
+      text-align: center;
+    }
+    .poster-box {
+      border: 1px dashed rgba(166, 132, 74, 0.6);
+      border-radius: 12px;
+      padding: 8px;
+      background: #fffdf8;
+    }
+    .poster-box img {
+      display: block;
+      width: 100%;
+      max-height: 280px;
+      object-fit: cover;
+      border-radius: 8px;
+    }
+    .poster-placeholder {
+      text-align: center;
+      font-size: 12px;
+      color: #8a734e;
+      padding: 14px 8px;
+    }
+
+    .rsvp-btn {
+      display: block;
+      width: 100%;
+      text-align: center;
+      text-decoration: none;
+      background: linear-gradient(135deg, #b57d32, #d8b06d);
+      color: #fff;
+      font-weight: 800;
+      font-size: 15px;
+      border-radius: 12px;
+      padding: 12px 14px;
+      box-shadow: 0 10px 24px rgba(137, 96, 36, 0.32);
+    }
+    .open-btn {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 20px;
+      z-index: 8;
+      border: 0;
+      border-radius: 999px;
+      background: #fff;
+      border: 1px solid rgba(202, 164, 79, 0.5);
+      color: #775a29;
+      font-weight: 800;
+      font-size: 14px;
+      padding: 10px 16px;
+      cursor: pointer;
+      box-shadow: 0 10px 20px rgba(60, 43, 21, 0.2);
+    }
+    .scene.open .env-flap {
+      transform: rotateX(178deg);
+      z-index: 0;
+    }
+    .scene.open .seal { opacity: 0; }
+    .scene.open .invitation {
+      transform: translateX(-50%) translateY(-52%);
+      z-index: 7;
+    }
+    .scene.open .envelope { overflow: visible; }
+    .scene.open .env-front { pointer-events: none; }
+    .scene:not(.open) .rsvp-btn { pointer-events: none; }
+
+    @media (max-width: 420px) {
+      .envelope { height: 226px; }
+      .invitation { width: 87%; padding: 18px 14px 16px; }
+      .details { font-size: 12.8px; }
+      .editor { width: min(96vw, 310px); right: 8px; top: 44px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="scene" id="scene">
+    <div class="light"></div>
+    <div class="top-actions">
+      <a class="link-btn" href="./accueil.html">&larr; Accueil invitation</a>
+      <a class="link-btn" href="./invitation-mariage.html">Modele mariage</a>
+      <button class="panel-btn" id="toggleEditor" type="button">Personnaliser</button>
+    </div>
+
+    <aside class="editor" id="editorPanel" aria-label="Personnalisation">
+      <h3>Personnaliser l'invitation</h3>
+
+      <div class="mode-row">
+        <label><input type="radio" name="displayMode" value="text" checked> Carte texte</label>
+        <label><input type="radio" name="displayMode" value="image"> Affiche image</label>
+      </div>
+
+      <div class="group">
+        <label for="inpNames">Noms des maries</label>
+        <input id="inpNames" type="text" value="Amina & Daniel">
+      </div>
+
+      <div class="group">
+        <label for="inpDate">Date et heure</label>
+        <input id="inpDate" type="text" value="15 Aout 2026 - 16h00">
+      </div>
+
+      <div class="group">
+        <label for="inpLieu">Lieu</label>
+        <input id="inpLieu" type="text" value="Hotel Royal Palace, Lome">
+      </div>
+
+      <div class="group">
+        <label for="inpMessage">Message</label>
+        <textarea id="inpMessage">Merci de confirmer votre presence avant le 30 Juillet 2026.</textarea>
+      </div>
+
+      <div class="group">
+        <label for="inpImage">Affiche mariage (.jpg/.png)</label>
+        <input id="inpImage" type="file" accept="image/png,image/jpeg,image/webp">
+      </div>
+
+      <div class="actions">
+        <button class="small-btn" id="resetBtn" type="button">Reinitialiser</button>
+        <button class="small-btn" id="closeEditor" type="button">Fermer</button>
+      </div>
+
+      <hr style="border:0;border-top:1px solid rgba(202,164,79,0.28);margin:10px 0;">
+
+      <h3>Envoi WhatsApp</h3>
+      <div class="group">
+        <label for="inpRecipients">Destinataires (1 numéro par ligne, format 22890000000)</label>
+        <textarea id="inpRecipients" placeholder="22890000000&#10;22891000000"></textarea>
+      </div>
+      <div class="group">
+        <label for="inpPublicUrl">URL publique invitation (HTTPS)</label>
+        <input id="inpPublicUrl" type="text" placeholder="https://ton-site.com/invitation/invitation-mariage.html">
+      </div>
+      <div class="actions">
+        <button class="small-btn" id="copyMsgBtn" type="button">Copier le message</button>
+        <button class="small-btn" id="buildWaBtn" type="button">Generer les liens WA</button>
+        <button class="small-btn" id="sendTestBtn" type="button">Envoyer test WhatsApp</button>
+      </div>
+      <div class="wa-output" id="waLinksBox"></div>
+      <div class="wa-note" id="waNote"></div>
+    </aside>
+
+    <div class="sparkles">
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+    <div class="petals">
+      <span class="petal"></span><span class="petal"></span><span class="petal"></span><span class="petal"></span><span class="petal"></span>
+    </div>
+
+    <div class="envelope-wrap">
+      <div class="envelope">
+        <div class="env-back"></div>
+        <article class="invitation">
+          <div id="textCard">
+            <h1 class="names" id="cardNames">Amina & Daniel</h1>
+            <p class="intro">Avec la benediction de nos familles, nous avons la joie de vous inviter a celebrer notre union.</p>
+            <div class="details">
+              <div id="cardDate">📅 <strong>15 Aout 2026 - 16h00</strong></div>
+              <div id="cardLieu">📍 <strong>Lieu :</strong> Hotel Royal Palace, Lome</div>
+            </div>
+            <p class="confirm" id="cardMessage">💌 Merci de confirmer votre presence avant le <strong>30 Juillet 2026</strong>.</p>
+            <p class="confirm">💖 Nous avons hate de partager ce moment inoubliable avec vous.</p>
+          </div>
+
+          <div class="poster-box hidden" id="imageCard">
+            <img id="posterPreview" alt="Affiche mariage personnalisee">
+            <div class="poster-placeholder" id="posterPlaceholder">Ajoutez une affiche pour remplacer la carte texte.</div>
+          </div>
+
+          <a class="rsvp-btn" href="https://wa.me/22890000000?text=Bonjour%20Amina%20%26%20Daniel%2C%20je%20confirme%20ma%20presence%20au%20mariage." target="_blank" rel="noopener">Confirmer ma presence</a>
+        </article>
+        <div class="env-front"></div>
+        <div class="env-flap"></div>
+        <div class="seal" id="sealText">A&amp;D</div>
+      </div>
+    </div>
+
+    <button class="open-btn" id="openBtn" type="button">Ouvrir l'enveloppe</button>
+  </div>
+
+  <script>
+    const scene = document.getElementById("scene");
+    const openBtn = document.getElementById("openBtn");
+    const toggleEditor = document.getElementById("toggleEditor");
+    const closeEditor = document.getElementById("closeEditor");
+    const editorPanel = document.getElementById("editorPanel");
+    const resetBtn = document.getElementById("resetBtn");
+    const copyMsgBtn = document.getElementById("copyMsgBtn");
+    const buildWaBtn = document.getElementById("buildWaBtn");
+    const waLinksBox = document.getElementById("waLinksBox");
+    const waNote = document.getElementById("waNote");
+    const inpRecipients = document.getElementById("inpRecipients");
+    const sendTestBtn = document.getElementById("sendTestBtn");
+    const inpPublicUrl = document.getElementById("inpPublicUrl");
+    const sealText = document.getElementById("sealText");
+
+    const textCard = document.getElementById("textCard");
+    const imageCard = document.getElementById("imageCard");
+    const posterPreview = document.getElementById("posterPreview");
+    const posterPlaceholder = document.getElementById("posterPlaceholder");
+
+    const inpNames = document.getElementById("inpNames");
+    const inpDate = document.getElementById("inpDate");
+    const inpLieu = document.getElementById("inpLieu");
+    const inpMessage = document.getElementById("inpMessage");
+    const inpImage = document.getElementById("inpImage");
+
+    const cardNames = document.getElementById("cardNames");
+    const cardDate = document.getElementById("cardDate");
+    const cardLieu = document.getElementById("cardLieu");
+    const cardMessage = document.getElementById("cardMessage");
+
+    const defaults = {
+      names: "Amina & Daniel",
+      date: "15 Aout 2026 - 16h00",
+      lieu: "Hotel Royal Palace, Lome",
+      message: "Merci de confirmer votre presence avant le 30 Juillet 2026."
+    };
+
+    let opened = false;
+    let mode = "text";
+
+    function initialsFromNames(raw) {
+      const parts = String(raw || "").split("&").join(" ").trim().split(/\s+/).filter(Boolean);
+      if (!parts.length) return "A&D";
+      if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+      return (parts[0][0] + "&" + parts[parts.length - 1][0]).toUpperCase();
+    }
+
+    function toggleEnvelope() {
+      opened = !opened;
+      scene.classList.toggle("open", opened);
+      openBtn.textContent = opened ? "Refermer l'enveloppe" : "Ouvrir l'enveloppe";
+    }
+
+    function syncTextCard() {
+      const names = inpNames.value.trim() || defaults.names;
+      cardNames.textContent = names;
+      sealText.textContent = initialsFromNames(names);
+      cardDate.innerHTML = `📅 <strong>${(inpDate.value.trim() || defaults.date)}</strong>`;
+      cardLieu.innerHTML = `📍 <strong>Lieu :</strong> ${(inpLieu.value.trim() || defaults.lieu)}`;
+      cardMessage.innerHTML = `💌 ${(inpMessage.value.trim() || defaults.message)}`;
+    }
+
+    function buildMessageText() {
+      const names = inpNames.value.trim() || defaults.names;
+      const date = inpDate.value.trim() || defaults.date;
+      const lieu = inpLieu.value.trim() || defaults.lieu;
+      const message = inpMessage.value.trim() || defaults.message;
+      const baseLink = inpPublicUrl.value.trim() || window.location.href.split("?")[0];
+      const shareParams = new URLSearchParams({ names, date, lieu, msg: message });
+      const link = `${baseLink}?${shareParams.toString()}`;
+      return `${link}\n\n✨ ${names} ✨\n\nAvec la benediction de nos familles, nous avons la joie de vous inviter a celebrer notre union.\n\n📅 ${date}\n📍 ${lieu}\n\n💌 ${message}`;
+    }
+
+    async function copyMessageToClipboard() {
+      const txt = buildMessageText();
+      try {
+        await navigator.clipboard.writeText(txt);
+        waNote.textContent = "Message copie. Vous pouvez le coller dans WhatsApp.";
+      } catch {
+        waNote.textContent = "Copie automatique impossible ici. Selectionnez puis copiez manuellement.";
+      }
+    }
+
+    function normalizePhone(raw) {
+      const onlyDigits = String(raw).replace(/\D/g, "");
+      return onlyDigits;
+    }
+
+    function buildWhatsAppLinks() {
+      const lines = inpRecipients.value.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+      const message = encodeURIComponent(buildMessageText());
+      waLinksBox.innerHTML = "";
+
+      if (!lines.length) {
+        waNote.textContent = "Ajoutez au moins un numero destinataire.";
+        return;
+      }
+
+      const links = lines.map(normalizePhone).filter((p) => p.length >= 8);
+      if (!links.length) {
+        waNote.textContent = "Format invalide. Exemple: 22890000000";
+        return;
+      }
+
+      links.forEach((phone, idx) => {
+        const a = document.createElement("a");
+        a.href = `https://wa.me/${phone}?text=${message}`;
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.textContent = `Ouvrir WhatsApp destinataire ${idx + 1} (${phone})`;
+        waLinksBox.appendChild(a);
+      });
+
+      waNote.textContent = "Pour voir l'enveloppe en apercu dans WhatsApp, utilisez une URL publique HTTPS avec balises Open Graph (og:title, og:description, og:image).";
+    }
+
+    function sendWhatsAppTest() {
+      const firstLine = inpRecipients.value.split(/\r?\n/).map((s) => s.trim()).find(Boolean);
+      if (!firstLine) {
+        waNote.textContent = "Ajoutez d'abord votre numero dans Destinataires (ex: 22890000000).";
+        return;
+      }
+      const phone = normalizePhone(firstLine);
+      if (phone.length < 8) {
+        waNote.textContent = "Numero invalide. Exemple: 22890000000";
+        return;
+      }
+      const message = encodeURIComponent(buildMessageText());
+      window.open(`https://wa.me/${phone}?text=${message}`, "_blank", "noopener");
+    }
+
+    function setMode(nextMode) {
+      mode = nextMode;
+      const isImage = mode === "image";
+      textCard.classList.toggle("hidden", isImage);
+      imageCard.classList.toggle("hidden", !isImage);
+    }
+
+    function resetAll() {
+      inpNames.value = defaults.names;
+      inpDate.value = defaults.date;
+      inpLieu.value = defaults.lieu;
+      inpMessage.value = defaults.message;
+      inpImage.value = "";
+      inpRecipients.value = "";
+      inpPublicUrl.value = "";
+      posterPreview.removeAttribute("src");
+      posterPreview.classList.add("hidden");
+      posterPlaceholder.classList.remove("hidden");
+      waLinksBox.innerHTML = "";
+      waNote.textContent = "";
+      document.querySelector('input[name="displayMode"][value="text"]').checked = true;
+      setMode("text");
+      syncTextCard();
+    }
+
+    openBtn.addEventListener("click", toggleEnvelope);
+    toggleEditor.addEventListener("click", () => editorPanel.classList.toggle("open"));
+    closeEditor.addEventListener("click", () => editorPanel.classList.remove("open"));
+    resetBtn.addEventListener("click", resetAll);
+    copyMsgBtn.addEventListener("click", copyMessageToClipboard);
+    buildWaBtn.addEventListener("click", buildWhatsAppLinks);
+    sendTestBtn.addEventListener("click", sendWhatsAppTest);
+
+    [inpNames, inpDate, inpLieu, inpMessage].forEach((el) => {
+      el.addEventListener("input", syncTextCard);
+    });
+
+    document.querySelectorAll('input[name="displayMode"]').forEach((radio) => {
+      radio.addEventListener("change", () => setMode(radio.value));
+    });
+
+    inpImage.addEventListener("change", () => {
+      const file = inpImage.files && inpImage.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        posterPreview.src = String(reader.result);
+        posterPreview.classList.remove("hidden");
+        posterPlaceholder.classList.add("hidden");
+        document.querySelector('input[name="displayMode"][value="image"]').checked = true;
+        setMode("image");
+      };
+      reader.readAsDataURL(file);
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!event.target.closest(".editor") && !event.target.closest("#toggleEditor")) {
+        editorPanel.classList.remove("open");
+      }
+    });
+
+    const qs = new URLSearchParams(window.location.search);
+    if (qs.get("names")) inpNames.value = qs.get("names");
+    if (qs.get("date")) inpDate.value = qs.get("date");
+    if (qs.get("lieu")) inpLieu.value = qs.get("lieu");
+    if (qs.get("msg")) inpMessage.value = qs.get("msg");
+    if (window.location.protocol === "file:") {
+      waNote.textContent = "Apercu WhatsApp non disponible en local (file://). Hebergez la page en HTTPS pour afficher l'enveloppe dans la messagerie du destinataire.";
+    }
+    syncTextCard();
+  </script>
+</body>
+</html>

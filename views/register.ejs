@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <%- include("partials/head", { title: "Inscription", description: "Inscription au systeme RSVP" }) %>
+</head>
+<body>
+  <main class="auth-shell">
+    <section class="auth-card">
+      <h1>Inscription</h1>
+      <p class="muted">Creez votre espace prive pour vos invitations.</p>
+      <% if (error) { %><p class="alert error"><%= error %></p><% } %>
+      <form class="stack" action="/inscription" method="post">
+        <label>Nom complet
+          <input name="fullName" type="text" required placeholder="Amina et Daniel">
+        </label>
+        <label>Email
+          <input name="email" type="email" required placeholder="vous@email.com">
+        </label>
+        <label>Mot de passe (8 caracteres minimum)
+          <input name="password" type="password" minlength="8" required placeholder="********">
+        </label>
+        <button class="primary-btn" type="submit">Creer mon compte</button>
+      </form>
+      <p class="tiny">Vous avez deja un compte ? <a href="/connexion">Se connecter</a></p>
+    </section>
+  </main>
+  <script src="/js/theme.js"></script>
+</body>
+</html>

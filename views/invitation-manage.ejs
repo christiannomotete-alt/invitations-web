@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <%- include("partials/head", { title: "Gestion invitation", description: "Gestion RSVP et partages WhatsApp" }) %>
+</head>
+<body>
+  <div class="page-wrap">
+    <%- include("partials/header", { currentUser }) %>
+    <main class="content">
+      <section class="hero-card">
+        <% const invitationTypeMeta = eventTypes.find((t) => t.value === selectedEventType) || eventTypes[0]; %>
+        <div>
+          <h1>Gestion invitation: <%= invitation.couple_names %></h1>
+          <p class="muted">Type: <strong><%= invitationTypeMeta.label %></strong></p>
+          <p class="muted">Les invites recoivent uniquement leurs liens RSVP prives par WhatsApp.</p>
+          <p class="tiny">ID unique: <code><%= invitation.id %></code></p>
+        </div>
+        <div class="actions-inline">
+          <a class="ghost-btn" href="/tableau-de-bord/invitation/<%= invitation.id %>/pdf">Telecharger PDF</a>
+          <a class="ghost-btn" href="/tableau-de-bord">Retour dashboard</a>
+        </div>
+      </section>
+
+      <% if (success) { %><p class="alert success"><%= success %></p><% } %>
+      <% if (error) { %><p class="alert error"><%= error %></p><% } %>
+
+      <section class="grid two">
+        <article class="panel">
+          <h3>Compteurs automatiques RSVP</h3>
+          <div class="stats">
+            <span>Total invites: <strong><%= stats.guest_count || 0 %></strong></span>
+            <span>✅ Presents: <strong><%= stats.yes_count || 0 %></strong></span>
+            <span>❌ Absents: <strong><%= stats.no_count || 0 %></strong></span>
+          </div>
+        </article>
+        <article class="panel">
+          <h3>Edition rapide</h3>
+          <form class="stack" action="/tableau-de-bord/invitation/<%= invitation.id %>/modifier" method="post" enctype="multipart/form-data">
+            <label>Type d'invitation
+              <select name="eventType" required>
+                <% eventTypes.forEach((type) => { %>
+                  <option value="<%= type.value %>" <%= selectedEventType === type.value ? "selected" : "" %>><%= type.label %></option>
+                <% }) %>
+              </select>
+            </label>
+            <label>Nom de l'evenement / organisateur
+              <input name="coupleNames" type="text" required value="<%= invitation.couple_names %>">
+            </label>
+            <label>Date
+              <input name="eventDate" type="text" required value="<%= invitation.event_date %>">
+            </label>
+            <label>Lieu
+              <input name="venue" type="text" required value="<%= invitation.venue %>">
+            </label>
+            <label>Message
+              <textarea name="message" rows="3" required><%= invitation.message %></textarea>
+            </label>
+            <label>Nouvelle image (optionnel)
+              <input name="image" type="file" accept="image/png,image/jpeg,image/webp">
+            </label>
+            <label>OG title
+              <input name="ogTitle" type="text" value="<%= invitation.og_title || '' %>">
+            </label>
+            <label>OG description
+              <textarea name="ogDescription" rows="3"><%= invitation.og_description || '' %></textarea>
+            </label>
+            <label>Ajouter des invites (Nom|Numero ou Nom +Numero)
+              <textarea name="newGuests" rows="5" placeholder="Nouvel Invite|22892000000&#10;Autre Invite +22893000000"></textarea>
+            </label>
+            <button class="primary-btn" type="submit">Enregistrer</button>
+          </form>
+        </article>
+      </section>
+
+      <% const confirmedGuests = guests.filter((g) => g.rsvp_status === "yes"); %>
+      <section class="panel">
+        <h3>Liste des confirmes</h3>
+        <% if (!confirmedGuests.length) { %>
+          <p class="muted">Aucune confirmation pour le moment.</p>
+        <% } else { %>
+          <p><strong><%= confirmedGuests.length %></strong> invite(s) ont confirme leur presence.</p>
+          <div class="stats">
+            <% confirmedGuests.forEach((guest) => { %>
+              <span><%= guest.full_name %></span>
+            <% }) %>
+          </div>
+        <% } %>
+      </section>
+
+      <section class="panel">
+        <h3>Liste des invites et partage WhatsApp</h3>
+        <% if (!guests.length) { %>
+          <p class="muted">Aucun invite pour le moment.</p>
+        <% } else { %>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nom</th>
+                  <th>Numero</th>
+                  <th>Statut</th>
+                  <th>Lien unique</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% guests.forEach((guest) => { %>
+                  <tr>
+                    <td><%= guest.full_name %></td>
+                    <td><%= guest.phone || '-' %></td>
+                    <td>
+                      <% if (guest.rsvp_status === "yes") { %>✅ Present<% } %>
+                      <% if (guest.rsvp_status === "no") { %>❌ Absent<% } %>
+                      <% if (guest.rsvp_status === "pending") { %>En attente<% } %>
+                    </td>
+                    <td><a href="<%= guest.invitationUrl %>" target="_blank" rel="noopener">Lien RSVP</a></td>
+                    <td>
+                      <div class="actions-inline">
+                        <a class="ghost-btn" href="<%= guest.whatsappLink %>" target="_blank" rel="noopener">WhatsApp</a>
+                        <form action="/tableau-de-bord/guest/<%= guest.id %>/supprimer" method="post">
+                          <button class="ghost-btn" type="submit">Supprimer</button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </section>
+    </main>
+  </div>
+  <script src="/js/theme.js"></script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <%- include("partials/head", { title: "Connexion", description: "Connexion au systeme de gestion des invitations" }) %>
+</head>
+<body>
+  <main class="auth-shell">
+    <section class="auth-card">
+      <h1>Connexion</h1>
+      <p class="muted">Connectez-vous pour gerer vos invitations et vos confirmations RSVP.</p>
+      <% if (error) { %><p class="alert error"><%= error %></p><% } %>
+      <form class="stack" action="/connexion" method="post">
+        <label>Email
+          <input name="email" type="email" required placeholder="vous@email.com">
+        </label>
+        <label>Mot de passe
+          <input name="password" type="password" required placeholder="********">
+        </label>
+        <button class="primary-btn" type="submit">Se connecter</button>
+      </form>
+      <div class="oauth-separator"><span>ou</span></div>
+      <a class="google-btn" href="/auth/google" aria-label="Se connecter avec Google">
+        <span class="google-mark">G</span>
+        <span>Se connecter avec Google</span>
+      </a>
+      <p class="tiny">Pas encore de compte ? <a href="/inscription">Creer un compte</a></p>
+    </section>
+  </main>
+  <script src="/js/theme.js"></script>
+</body>
+</html>
