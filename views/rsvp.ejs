@@ -242,6 +242,66 @@
     .flash-toast.show {
       opacity: 1;
     }
+    @media (max-width: 760px) {
+      .scene {
+        width: min(560px, 97vw);
+        min-height: calc(100vh - 28px);
+        height: min(92vh, 860px);
+        aspect-ratio: auto;
+      }
+      .envelope-wrap {
+        bottom: 11%;
+      }
+      .envelope {
+        height: 380px;
+      }
+      .invitation {
+        width: 90%;
+        max-height: 66vh;
+        padding: 20px 15px;
+      }
+      .scene.open .invitation {
+        transform: translateX(-50%) translateY(-44%);
+      }
+      .open-toggle {
+        bottom: 14px;
+        padding: 11px 16px;
+      }
+    }
+    @media (max-width: 430px) {
+      body {
+        padding: 8px;
+      }
+      .scene {
+        width: 100%;
+        min-height: calc(100vh - 16px);
+        border-radius: 22px;
+      }
+      .top-label {
+        top: 12px;
+        font-size: 1.05rem;
+      }
+      .envelope-wrap {
+        bottom: 12%;
+        width: 95%;
+      }
+      .envelope {
+        height: 320px;
+      }
+      .invitation {
+        width: 91%;
+        max-height: 58vh;
+        padding: 16px 12px;
+        border-radius: 16px;
+      }
+      .scene.open .invitation {
+        transform: translateX(-50%) translateY(-36%);
+      }
+      .open-toggle {
+        bottom: 10px;
+        width: min(88vw, 320px);
+      }
+    }
   </style>
 </head>
 <body>

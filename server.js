@@ -1164,6 +1164,19 @@ app.get("/tableau-de-bord/invitation/:id/pdf", requireAuth, (req, res) => {
     .prepare("SELECT * FROM guests WHERE invitation_id = ? ORDER BY full_name")
     .all(invitation.id);
 
+  function formatDateTime(value) {
+    if (!value) return "-";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return date.toLocaleString("fr-FR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  }
+
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename=\"invites-${invitation.id}.pdf\"`);
 
@@ -1179,12 +1192,61 @@ app.get("/tableau-de-bord/invitation/:id/pdf", requireAuth, (req, res) => {
   doc.text(`Total invites: ${guests.length}`);
   doc.text(`Confirmes: ${guests.filter((g) => g.rsvp_status === "yes").length}`);
   doc.text(`Absents: ${guests.filter((g) => g.rsvp_status === "no").length}`);
-  doc.moveDown();
-  guests.forEach((guest, index) => {
+  doc.moveDown(1.2);
+
+  const tableTop = doc.y;
+  const left = doc.page.margins.left;
+  const tableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const colRatios = [0.34, 0.23, 0.23, 0.2];
+  const colWidths = colRatios.map((r) => r * tableWidth);
+  const rowHeight = 22;
+  const headerHeight = 24;
+  const bottomLimit = doc.page.height - doc.page.margins.bottom;
+
+  function drawHeader(y) {
+    const headers = ["Nom", "Date invitation", "Date approbation", "Statut"];
+    let x = left;
+    doc.rect(left, y, tableWidth, headerHeight).fillAndStroke("#e9eefb", "#b9c7ea");
+    doc.fillColor("#1d2f5d").font("Helvetica-Bold").fontSize(10);
+    headers.forEach((text, idx) => {
+      doc.text(text, x + 6, y + 7, { width: colWidths[idx] - 12, align: "left" });
+      x += colWidths[idx];
+    });
+    doc.fillColor("#000");
+    doc.font("Helvetica").fontSize(9.5);
+  }
+
+  function drawRow(y, values) {
+    let x = left;
+    values.forEach((value, idx) => {
+      doc.rect(x, y, colWidths[idx], rowHeight).stroke("#d2d9ef");
+      doc.text(String(value), x + 6, y + 6, { width: colWidths[idx] - 12, align: "left" });
+      x += colWidths[idx];
+    });
+  }
+
+  let y = tableTop;
+  drawHeader(y);
+  y += headerHeight;
+
+  for (const guest of guests) {
+    if (y + rowHeight > bottomLimit) {
+      doc.addPage();
+      y = doc.page.margins.top;
+      drawHeader(y);
+      y += headerHeight;
+    }
     const status =
       guest.rsvp_status === "yes" ? "Present" : guest.rsvp_status === "no" ? "Absent" : "En attente";
-    doc.text(`${index + 1}. ${guest.full_name} | ${guest.phone || "Sans numero"} | ${status}`);
-  });
+    drawRow(y, [
+      guest.full_name || "-",
+      formatDateTime(guest.created_at),
+      formatDateTime(guest.responded_at),
+      status
+    ]);
+    y += rowHeight;
+  }
+
   doc.end();
 });
 
