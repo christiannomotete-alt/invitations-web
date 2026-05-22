@@ -17,7 +17,8 @@
 
       <% if (error) { %><p class="alert error"><%= error %></p><% } %>
 
-      <form class="panel stack" action="<%= action %>" method="post" enctype="multipart/form-data">
+      <form class="panel stack" action="<%= `${action}?_csrf=${encodeURIComponent(csrfToken)}` %>" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <label>Type d'invitation
           <select name="eventType" required>
             <option value="" <%= !selectedEventType ? "selected" : "" %> disabled>Choisir un type</option>
@@ -27,28 +28,37 @@
           </select>
         </label>
         <label>Nom de l'evenement / organisateur
-          <input name="coupleNames" type="text" required>
+          <input name="coupleNames" type="text" required value="<%= invitation?.couple_names || '' %>">
         </label>
         <label>Date de l'evenement
-          <input name="eventDate" type="text" required>
+          <input name="eventDate" type="text" required value="<%= invitation?.event_date || '' %>">
+        </label>
+        <label>Date ISO pour relances auto (optionnel)
+          <input name="eventDateIso" type="date" value="<%= invitation?.event_date_iso || '' %>">
         </label>
         <label>Lieu
-          <input name="venue" type="text" required>
+          <input name="venue" type="text" required value="<%= invitation?.venue || '' %>">
         </label>
         <label>Message
-          <textarea name="message" rows="4" required></textarea>
+          <textarea name="message" rows="4" required><%= invitation?.message || '' %></textarea>
         </label>
         <label>Image de couverture (preview WhatsApp)
           <input name="image" type="file" accept="image/png,image/jpeg,image/webp">
         </label>
         <label>Titre Open Graph personnalise
-          <input name="ogTitle" type="text">
+          <input name="ogTitle" type="text" value="<%= invitation?.og_title || '' %>">
         </label>
         <label>Description Open Graph personnalisee
-          <textarea name="ogDescription" rows="3"></textarea>
+          <textarea name="ogDescription" rows="3"><%= invitation?.og_description || '' %></textarea>
         </label>
         <label>Liste invites (1 par ligne: Nom|Numero ou Nom +Numero)
           <textarea name="guests" rows="8"></textarea>
+        </label>
+        <label>Coller un CSV invite (nom,numero)
+          <textarea name="guestsCsv" rows="4" placeholder="nom,numero&#10;Marie,22890000000"></textarea>
+        </label>
+        <label>Importer un fichier CSV (export Excel en .csv)
+          <input name="guestsCsvFile" type="file" accept=".csv,text/csv,text/plain,application/vnd.ms-excel">
         </label>
         <button class="primary-btn" type="submit">Creer l'invitation</button>
       </form>

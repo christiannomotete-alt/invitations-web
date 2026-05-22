@@ -17,6 +17,10 @@
         </div>
         <div class="actions-inline">
           <a class="ghost-btn" href="/tableau-de-bord/invitation/<%= invitation.id %>/pdf">Telecharger PDF</a>
+          <form action="/tableau-de-bord/invitation/<%= invitation.id %>/dupliquer" method="post">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="ghost-btn" type="submit">Dupliquer</button>
+          </form>
           <a class="ghost-btn" href="/tableau-de-bord">Retour dashboard</a>
         </div>
       </section>
@@ -29,13 +33,15 @@
           <h3>Compteurs automatiques RSVP</h3>
           <div class="stats">
             <span>Total invites: <strong><%= stats.guest_count || 0 %></strong></span>
-            <span>✅ Presents: <strong><%= stats.yes_count || 0 %></strong></span>
-            <span>❌ Absents: <strong><%= stats.no_count || 0 %></strong></span>
+            <span>Presents: <strong><%= stats.yes_count || 0 %></strong></span>
+            <span>En attente: <strong><%= stats.pending_count || 0 %></strong></span>
+            <span>Absents: <strong><%= stats.no_count || 0 %></strong></span>
           </div>
         </article>
         <article class="panel">
           <h3>Edition rapide</h3>
-          <form class="stack" action="/tableau-de-bord/invitation/<%= invitation.id %>/modifier" method="post" enctype="multipart/form-data">
+          <form class="stack" action="/tableau-de-bord/invitation/<%= invitation.id %>/modifier?_csrf=<%= encodeURIComponent(csrfToken) %>" method="post" enctype="multipart/form-data">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <label>Type d'invitation
               <select name="eventType" required>
                 <% eventTypes.forEach((type) => { %>
@@ -48,6 +54,9 @@
             </label>
             <label>Date
               <input name="eventDate" type="text" required value="<%= invitation.event_date %>">
+            </label>
+            <label>Date ISO pour relances auto (J-7/J-3)
+              <input name="eventDateIso" type="date" value="<%= invitation.event_date_iso || '' %>">
             </label>
             <label>Lieu
               <input name="venue" type="text" required value="<%= invitation.venue %>">
@@ -67,9 +76,70 @@
             <label>Ajouter des invites (Nom|Numero ou Nom +Numero)
               <textarea name="newGuests" rows="5" placeholder="Nouvel Invite|22892000000&#10;Autre Invite +22893000000"></textarea>
             </label>
+            <label>Coller un CSV invite (nom,numero)
+              <textarea name="guestsCsv" rows="4" placeholder="nom,numero&#10;Marie,22890000000"></textarea>
+            </label>
+            <label>Importer un fichier CSV (export Excel en .csv)
+              <input name="guestsCsvFile" type="file" accept=".csv,text/csv,text/plain,application/vnd.ms-excel">
+            </label>
             <button class="primary-btn" type="submit">Enregistrer</button>
           </form>
         </article>
+      </section>
+
+      <section class="grid two">
+        <article class="panel">
+          <h3>Statistiques avancees</h3>
+          <div class="stats">
+            <span>Taux de reponse: <strong><%= advancedStats.responseRate %>%</strong></span>
+            <span>Reponses recues: <strong><%= advancedStats.respondedCount %>/<%= advancedStats.guestCount %></strong></span>
+            <span>Taux de presence: <strong><%= advancedStats.yesRateAmongResponses %>%</strong></span>
+          </div>
+        </article>
+        <article class="panel">
+          <h3>Top non-repondants</h3>
+          <% if (!topPendingGuests.length) { %>
+            <p class="muted">Tout le monde a repondu.</p>
+          <% } else { %>
+            <div class="stats">
+              <% topPendingGuests.forEach((guest) => { %>
+                <span><%= guest.full_name %><%= guest.phone ? ` (${guest.phone})` : "" %></span>
+              <% }) %>
+            </div>
+          <% } %>
+        </article>
+      </section>
+
+      <section class="panel">
+        <h3>Courbe des reponses (30 derniers jours actifs)</h3>
+        <% if (!trend.length) { %>
+          <p class="muted">Aucune reponse enregistree pour le moment.</p>
+        <% } else { %>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Jour</th>
+                  <th>Oui</th>
+                  <th>Non</th>
+                  <th>Total jour</th>
+                  <th>Cumul</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% trend.forEach((entry) => { %>
+                  <tr>
+                    <td><%= entry.day %></td>
+                    <td><%= entry.yesCount %></td>
+                    <td><%= entry.noCount %></td>
+                    <td><%= entry.total %></td>
+                    <td><strong><%= entry.cumulative %></strong></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
       </section>
 
       <% const confirmedGuests = guests.filter((g) => g.rsvp_status === "yes"); %>
@@ -99,6 +169,7 @@
                   <th>Nom</th>
                   <th>Numero</th>
                   <th>Statut</th>
+                  <th>Details RSVP</th>
                   <th>Lien unique</th>
                   <th>Actions</th>
                 </tr>
@@ -109,15 +180,33 @@
                     <td><%= guest.full_name %></td>
                     <td><%= guest.phone || '-' %></td>
                     <td>
-                      <% if (guest.rsvp_status === "yes") { %>✅ Present<% } %>
-                      <% if (guest.rsvp_status === "no") { %>❌ Absent<% } %>
+                      <% if (guest.rsvp_status === "yes") { %>Present<% } %>
+                      <% if (guest.rsvp_status === "no") { %>Absent<% } %>
                       <% if (guest.rsvp_status === "pending") { %>En attente<% } %>
+                    </td>
+                    <td class="tiny">
+                      <% if (guest.rsvp_status === "yes") { %>
+                        <div>Personnes: <strong><%= guest.attendee_count || 1 %></strong></div>
+                        <div>+1: <strong><%= guest.plus_one ? "Oui" : "Non" %></strong></div>
+                        <div>Menu: <strong><%= guest.menu_choice || "-" %></strong></div>
+                        <div>Allergies: <strong><%= guest.allergies || "-" %></strong></div>
+                        <div>Commentaire: <strong><%= guest.comment || "-" %></strong></div>
+                      <% } else { %>
+                        <span>-</span>
+                      <% } %>
                     </td>
                     <td><a href="<%= guest.invitationUrl %>" target="_blank" rel="noopener">Lien RSVP</a></td>
                     <td>
                       <div class="actions-inline">
+                        <form class="stack" action="/tableau-de-bord/guest/<%= guest.id %>/modifier" method="post" style="min-width: 220px;">
+                          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                          <input name="fullName" type="text" value="<%= guest.full_name %>" required>
+                          <input name="phone" type="text" value="<%= guest.phone || '' %>" placeholder="22890000000">
+                          <button class="ghost-btn" type="submit">Mettre a jour</button>
+                        </form>
                         <a class="ghost-btn" href="<%= guest.whatsappLink %>" target="_blank" rel="noopener">WhatsApp</a>
                         <form action="/tableau-de-bord/guest/<%= guest.id %>/supprimer" method="post">
+                          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                           <button class="ghost-btn" type="submit">Supprimer</button>
                         </form>
                       </div>

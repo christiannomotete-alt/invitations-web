@@ -21,7 +21,8 @@ const {
   baseUrl,
   isPublicHttpsUrl,
   buildEnvelopeMessage,
-  parseGuests
+  parseGuests,
+  parseGuestsCsv
 } = require("./utils");
 const {
   sendWhatsAppTextMessage,
@@ -46,6 +47,7 @@ const {
   WHATSAPP_ENVELOPE_IMAGE_MODE,
   WHATSAPP_ENVELOPE_IMAGE_URL,
   WHATSAPP_ENVELOPE_IMAGE_CAPTION,
+  APP_BASE_URL,
   EVENT_TYPES,
   PORT,
   isProduction
@@ -58,6 +60,10 @@ const DATA_DIR = config.DATA_DIR;
 const UPLOADS_DIR = config.UPLOADS_DIR;
 const LOGS_DIR = config.LOGS_DIR;
 const WHATSAPP_LOG_PATH = path.join(LOGS_DIR, "whatsapp-send.log");
+const CSRF_TOKEN_KEY = "_csrfToken";
+const LOGIN_ATTEMPT_LIMIT = 6;
+const LOGIN_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_LOCK_DURATION_MS = 20 * 60 * 1000;
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -103,31 +109,219 @@ function appendWhatsAppLogLine(line) {
   }
 }
 
+function getClientIp(req) {
+  return String(req.ip || req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "unknown");
+}
+
+function getSessionCsrfToken(req) {
+  if (!req.session[CSRF_TOKEN_KEY]) {
+    req.session[CSRF_TOKEN_KEY] = randomToken(24);
+  }
+  return req.session[CSRF_TOKEN_KEY];
+}
+
+function csrfProtection(req, res, next) {
+  res.locals.csrfToken = getSessionCsrfToken(req);
+  if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) return next();
+  const token = String(req.body?._csrf || req.query?._csrf || req.headers["x-csrf-token"] || "");
+  if (!token || token !== req.session[CSRF_TOKEN_KEY]) {
+    return res.status(403).send("Jeton CSRF invalide.");
+  }
+  return next();
+}
+
+function createRateLimiter({ windowMs, max, keyFn, message }) {
+  const hits = new Map();
+  return (req, res, next) => {
+    const key = keyFn(req);
+    const now = Date.now();
+    const current = hits.get(key);
+    if (!current || current.resetAt <= now) {
+      hits.set(key, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+    current.count += 1;
+    if (current.count > max) {
+      const waitSec = Math.max(1, Math.ceil((current.resetAt - now) / 1000));
+      return res.status(429).send(`${message} Reessayez dans ${waitSec}s.`);
+    }
+    return next();
+  };
+}
+
+const loginAttemptState = new Map();
+
+function getLoginAttemptKey(req, email) {
+  return `${String(email || "").trim().toLowerCase()}|${getClientIp(req)}`;
+}
+
+function getLoginBlockState(req, email) {
+  const key = getLoginAttemptKey(req, email);
+  const now = Date.now();
+  const entry = loginAttemptState.get(key);
+  if (!entry) return { blocked: false, key };
+  if (entry.lockUntil && entry.lockUntil > now) {
+    return { blocked: true, key, waitMs: entry.lockUntil - now };
+  }
+  if (entry.windowStart + LOGIN_ATTEMPT_WINDOW_MS <= now) {
+    loginAttemptState.delete(key);
+    return { blocked: false, key };
+  }
+  return { blocked: false, key };
+}
+
+function registerLoginFailure(key) {
+  const now = Date.now();
+  const entry = loginAttemptState.get(key);
+  if (!entry || entry.windowStart + LOGIN_ATTEMPT_WINDOW_MS <= now) {
+    loginAttemptState.set(key, { count: 1, windowStart: now, lockUntil: 0 });
+    return;
+  }
+  entry.count += 1;
+  if (entry.count >= LOGIN_ATTEMPT_LIMIT) {
+    entry.lockUntil = now + LOGIN_LOCK_DURATION_MS;
+  }
+}
+
+function clearLoginFailures(req, email) {
+  const key = getLoginAttemptKey(req, email);
+  loginAttemptState.delete(key);
+}
+
+function normalizeIsoDateInput(raw) {
+  const value = String(raw || "").trim();
+  if (!value) return null;
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+
+function daysUntilIsoDate(isoDate) {
+  const match = String(isoDate || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const targetUtc = Date.UTC(year, month - 1, day);
+  const now = new Date();
+  const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return Math.floor((targetUtc - todayUtc) / (24 * 60 * 60 * 1000));
+}
+
+function decodeUploadedCsv(file) {
+  if (!file) return "";
+  try {
+    if (file.buffer) {
+      return file.buffer.toString("utf8").replace(/^\uFEFF/, "");
+    }
+    if (file.path && fs.existsSync(file.path)) {
+      return fs.readFileSync(file.path, "utf8").replace(/^\uFEFF/, "");
+    }
+  } catch {
+    return "";
+  }
+  return "";
+}
+
+function mergeGuests(...groups) {
+  const map = new Map();
+  for (const group of groups) {
+    for (const guest of group || []) {
+      const fullName = String(guest.fullName || "").trim();
+      const phoneRaw = String(guest.phone || "").trim();
+      const phone = phoneRaw ? normalizePhone(phoneRaw) : null;
+      if (!fullName) continue;
+      const normalizedPhone = phone && phone.length >= 8 ? phone : null;
+      const key = `${fullName.toLowerCase()}|${normalizedPhone || "-"}`;
+      if (!map.has(key)) {
+        map.set(key, { fullName, phone: normalizedPhone });
+      }
+    }
+  }
+  return Array.from(map.values());
+}
+
+function cleanupUploadedFile(file) {
+  try {
+    if (!file?.path) return;
+    if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+  } catch {
+    return;
+  }
+}
+
+const authRateLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 30,
+  keyFn: (req) => `auth:${getClientIp(req)}`,
+  message: "Trop de tentatives sur l'authentification."
+});
+
+const rsvpRateLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 50,
+  keyFn: (req) => `rsvp:${req.params.token}:${getClientIp(req)}`,
+  message: "Trop de requetes RSVP."
+});
+
+app.use(csrfProtection);
+
 function requireAuth(req, res, next) {
   if (!req.session.userId) return res.redirect("/connexion");
   return next();
 }
 
-function getDashboardInvitations(userId) {
+function getDashboardInvitations(userId, { search = "", status = "all" } = {}) {
+  const normalizedStatus = ["all", "yes", "no", "pending"].includes(status) ? status : "all";
+  const q = `%${String(search || "").trim().toLowerCase()}%`;
+  const statusFilter =
+    normalizedStatus === "yes"
+      ? "AND yes_count > 0"
+      : normalizedStatus === "no"
+        ? "AND no_count > 0"
+        : normalizedStatus === "pending"
+          ? "AND pending_count > 0"
+          : "";
+
   return db
-    .prepare(`
-      SELECT
-        i.id,
-        i.event_type,
-        i.couple_names,
-        i.event_date,
-        i.venue,
-        i.created_at,
-        COUNT(g.id) AS guest_count,
-        SUM(CASE WHEN g.rsvp_status = 'yes' THEN 1 ELSE 0 END) AS yes_count,
-        SUM(CASE WHEN g.rsvp_status = 'no' THEN 1 ELSE 0 END) AS no_count
-      FROM invitations i
-      LEFT JOIN guests g ON g.invitation_id = i.id
-      WHERE i.owner_user_id = ?
-      GROUP BY i.id
-      ORDER BY i.created_at DESC
-    `)
-    .all(userId);
+    .prepare(
+      `
+      SELECT *
+      FROM (
+        SELECT
+          i.id,
+          i.event_type,
+          i.couple_names,
+          i.event_date,
+          i.venue,
+          i.created_at,
+          COUNT(g.id) AS guest_count,
+          SUM(CASE WHEN g.rsvp_status = 'yes' THEN 1 ELSE 0 END) AS yes_count,
+          SUM(CASE WHEN g.rsvp_status = 'no' THEN 1 ELSE 0 END) AS no_count,
+          SUM(CASE WHEN g.rsvp_status = 'pending' THEN 1 ELSE 0 END) AS pending_count
+        FROM invitations i
+        LEFT JOIN guests g ON g.invitation_id = i.id
+        WHERE i.owner_user_id = ?
+          AND (
+            ? = '%%'
+            OR LOWER(i.couple_names) LIKE ?
+            OR LOWER(i.venue) LIKE ?
+            OR EXISTS (
+              SELECT 1
+              FROM guests g2
+              WHERE g2.invitation_id = i.id
+                AND (
+                  LOWER(g2.full_name) LIKE ?
+                  OR LOWER(COALESCE(g2.phone, '')) LIKE ?
+                )
+            )
+          )
+        GROUP BY i.id
+      ) agg
+      WHERE 1 = 1
+      ${statusFilter}
+      ORDER BY created_at DESC
+    `
+    )
+    .all(userId, q, q, q, q, q);
 }
 
 app.use((req, res, next) => {
@@ -168,7 +362,7 @@ app.get("/inscription", (req, res) => {
   return res.render("register", { error: req.query.error || "", googleEnabled: GOOGLE_OAUTH_ENABLED });
 });
 
-app.post("/inscription", (req, res) => {
+app.post("/inscription", authRateLimiter, (req, res) => {
   const fullName = String(req.body.fullName || "").trim();
   const email = String(req.body.email || "").trim().toLowerCase();
   const password = String(req.body.password || "");
@@ -195,15 +389,22 @@ app.get("/connexion", (req, res) => {
   return res.render("login", { error: req.query.error || "", googleEnabled: GOOGLE_OAUTH_ENABLED });
 });
 
-app.post("/connexion", (req, res) => {
+app.post("/connexion", authRateLimiter, (req, res) => {
   const email = String(req.body.email || "").trim().toLowerCase();
   const password = String(req.body.password || "");
+  const blockState = getLoginBlockState(req, email);
+  if (blockState.blocked) {
+    const waitMin = Math.max(1, Math.ceil((blockState.waitMs || 0) / (60 * 1000)));
+    return res.redirect(`/connexion?error=Compte+temporairement+verrouille.+Reessayez+dans+${waitMin}+minute(s).`);
+  }
   const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
 
   if (!user || !verifyPassword(password, user.password_hash)) {
+    registerLoginFailure(blockState.key);
     return res.redirect("/connexion?error=Email+ou+mot+de+passe+incorrect.");
   }
 
+  clearLoginFailures(req, email);
   req.session.userId = user.id;
   return res.redirect("/tableau-de-bord");
 });
@@ -298,19 +499,38 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({
+const uploadInvitationAssets = multer({
   storage,
   fileFilter: (_req, file, cb) => {
-    const allowed = ["image/jpeg", "image/png", "image/webp"];
-    cb(null, allowed.includes(file.mimetype));
+    const imageAllowed = ["image/jpeg", "image/png", "image/webp"];
+    const csvAllowed = [
+      "text/csv",
+      "application/csv",
+      "text/plain",
+      "application/vnd.ms-excel"
+    ];
+
+    if (file.fieldname === "image") {
+      return cb(null, imageAllowed.includes(file.mimetype));
+    }
+    if (file.fieldname === "guestsCsvFile") {
+      return cb(null, csvAllowed.includes(file.mimetype));
+    }
+    return cb(null, false);
   },
   limits: { fileSize: 5 * 1024 * 1024 }
 });
 
 app.get("/tableau-de-bord", requireAuth, (req, res) => {
+  const search = String(req.query.search || "").trim();
+  const statusFilter = String(req.query.status || "all").trim().toLowerCase();
   return res.render("dashboard", {
-    invitations: getDashboardInvitations(req.session.userId),
+    invitations: getDashboardInvitations(req.session.userId, { search, status: statusFilter }),
     eventTypes: EVENT_TYPES,
+    filters: {
+      search,
+      status: ["all", "yes", "no", "pending"].includes(statusFilter) ? statusFilter : "all"
+    },
     success: req.query.success || "",
     error: req.query.error || ""
   });
@@ -331,6 +551,52 @@ app.post("/tableau-de-bord/invitation/:id/supprimer", requireAuth, (req, res) =>
   return res.redirect("/tableau-de-bord?success=Invitation+supprimee+avec+succes.");
 });
 
+app.post("/tableau-de-bord/invitation/:id/dupliquer", requireAuth, (req, res) => {
+  const source = db
+    .prepare("SELECT * FROM invitations WHERE id = ? AND owner_user_id = ?")
+    .get(req.params.id, req.session.userId);
+  if (!source) {
+    return res.redirect("/tableau-de-bord?error=Invitation+introuvable+pour+duplication.");
+  }
+
+  const sourceGuests = db
+    .prepare("SELECT full_name, phone FROM guests WHERE invitation_id = ? ORDER BY id ASC")
+    .all(source.id);
+
+  const newInvitationId = randomToken(10);
+  const newName = `${source.couple_names} (copie)`;
+
+  const tx = db.transaction(() => {
+    db.prepare(
+      `INSERT INTO invitations
+       (id, owner_user_id, event_type, couple_names, event_date, event_date_iso, venue, message, image_path, og_title, og_description)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      newInvitationId,
+      req.session.userId,
+      source.event_type,
+      newName,
+      source.event_date,
+      source.event_date_iso,
+      source.venue,
+      source.message,
+      source.image_path,
+      source.og_title,
+      source.og_description
+    );
+
+    const insertGuest = db.prepare(
+      "INSERT INTO guests (invitation_id, full_name, phone, token, rsvp_status, plus_one, attendee_count) VALUES (?, ?, ?, ?, 'pending', 0, 1)"
+    );
+    for (const guest of sourceGuests) {
+      insertGuest.run(newInvitationId, guest.full_name, guest.phone || null, randomToken(9));
+    }
+  });
+
+  tx();
+  return res.redirect(`/tableau-de-bord/invitation/${newInvitationId}?success=Invitation+dupliquee+avec+succes.`);
+});
+
 app.post("/tableau-de-bord/historique/supprimer", requireAuth, (req, res) => {
   db.prepare("DELETE FROM invitations WHERE owner_user_id = ?").run(req.session.userId);
   return res.redirect("/tableau-de-bord?success=Historique+des+invitations+supprime.");
@@ -346,12 +612,20 @@ app.get("/tableau-de-bord/nouvelle-invitation", requireAuth, (_req, res) => {
   });
 });
 
-app.post("/tableau-de-bord/nouvelle-invitation", requireAuth, upload.single("image"), async (req, res) => {
+app.post(
+  "/tableau-de-bord/nouvelle-invitation",
+  requireAuth,
+  uploadInvitationAssets.fields([
+    { name: "image", maxCount: 1 },
+    { name: "guestsCsvFile", maxCount: 1 }
+  ]),
+  async (req, res) => {
   const rawEventType = String(req.body.eventType || "").trim().toLowerCase();
   const eventTypeIsValid = EVENT_TYPES.some((item) => item.value === rawEventType);
   const eventType = eventTypeIsValid ? rawEventType : "mariage";
   const coupleNames = String(req.body.coupleNames || "").trim();
   const eventDate = String(req.body.eventDate || "").trim();
+  const eventDateIso = normalizeIsoDateInput(req.body.eventDateIso);
   const venue = String(req.body.venue || "").trim();
   const message = String(req.body.message || "").trim();
   const ogTitle = String(req.body.ogTitle || "").trim();
@@ -359,7 +633,16 @@ app.post("/tableau-de-bord/nouvelle-invitation", requireAuth, upload.single("ima
 
   if (!eventTypeIsValid || !coupleNames || !eventDate || !venue || !message) {
     return res.render("invitation-form", {
-      invitation: null,
+      invitation: {
+        event_type: eventType,
+        couple_names: coupleNames,
+        event_date: eventDate,
+        event_date_iso: eventDateIso,
+        venue,
+        message,
+        og_title: ogTitle,
+        og_description: ogDescription
+      },
       action: "/tableau-de-bord/nouvelle-invitation",
       error: "Tous les champs principaux sont obligatoires, y compris le type d'invitation.",
       eventTypes: EVENT_TYPES,
@@ -368,21 +651,28 @@ app.post("/tableau-de-bord/nouvelle-invitation", requireAuth, upload.single("ima
   }
 
   const invitationId = randomToken(10);
-  const imagePath = req.file ? `/uploads/${req.file.filename}` : null;
-  const guests = parseGuests(req.body.guests || "");
+  const imageFile = req.files?.image?.[0];
+  const csvFile = req.files?.guestsCsvFile?.[0];
+  const imagePath = imageFile ? `/uploads/${imageFile.filename}` : null;
+  const guestsFromText = parseGuests(req.body.guests || "");
+  const guestsFromCsvText = parseGuestsCsv(req.body.guestsCsv || "");
+  const guestsFromCsvFile = parseGuestsCsv(decodeUploadedCsv(csvFile));
+  cleanupUploadedFile(csvFile);
+  const guests = mergeGuests(guestsFromText, guestsFromCsvText, guestsFromCsvFile);
 
   const createdGuests = [];
   const tx = db.transaction(() => {
     db.prepare(
       `INSERT INTO invitations
-       (id, owner_user_id, event_type, couple_names, event_date, venue, message, image_path, og_title, og_description)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       (id, owner_user_id, event_type, couple_names, event_date, event_date_iso, venue, message, image_path, og_title, og_description)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       invitationId,
       req.session.userId,
       eventType,
       coupleNames,
       eventDate,
+      eventDateIso,
       venue,
       message,
       imagePath,
@@ -681,15 +971,73 @@ app.get("/tableau-de-bord/invitation/:id", requireAuth, (req, res) => {
       `SELECT
          COUNT(*) AS guest_count,
          SUM(CASE WHEN rsvp_status = 'yes' THEN 1 ELSE 0 END) AS yes_count,
-         SUM(CASE WHEN rsvp_status = 'no' THEN 1 ELSE 0 END) AS no_count
+         SUM(CASE WHEN rsvp_status = 'no' THEN 1 ELSE 0 END) AS no_count,
+         SUM(CASE WHEN rsvp_status = 'pending' THEN 1 ELSE 0 END) AS pending_count
        FROM guests WHERE invitation_id = ?`
     )
     .get(invitation.id);
+
+  const guestCount = Number(stats.guest_count || 0);
+  const yesCount = Number(stats.yes_count || 0);
+  const noCount = Number(stats.no_count || 0);
+  const pendingCount = Number(stats.pending_count || 0);
+  const respondedCount = yesCount + noCount;
+  const responseRate = guestCount > 0 ? Math.round((respondedCount / guestCount) * 100) : 0;
+  const yesRateAmongResponses = respondedCount > 0 ? Math.round((yesCount / respondedCount) * 100) : 0;
+
+  const trendRaw = db
+    .prepare(
+      `SELECT
+         DATE(created_at) AS day,
+         SUM(CASE WHEN status = 'yes' THEN 1 ELSE 0 END) AS yes_count,
+         SUM(CASE WHEN status = 'no' THEN 1 ELSE 0 END) AS no_count,
+         COUNT(*) AS total
+       FROM rsvp_events
+       WHERE invitation_id = ?
+       GROUP BY DATE(created_at)
+       ORDER BY day ASC
+       LIMIT 30`
+    )
+    .all(invitation.id);
+
+  let cumulative = 0;
+  const trend = trendRaw.map((row) => {
+    const total = Number(row.total || 0);
+    cumulative += total;
+    return {
+      day: row.day,
+      yesCount: Number(row.yes_count || 0),
+      noCount: Number(row.no_count || 0),
+      total,
+      cumulative
+    };
+  });
+
+  const topPendingGuests = db
+    .prepare(
+      `SELECT full_name, phone, created_at
+       FROM guests
+       WHERE invitation_id = ? AND rsvp_status = 'pending'
+       ORDER BY created_at ASC, id ASC
+       LIMIT 10`
+    )
+    .all(invitation.id);
 
   return res.render("invitation-manage", {
     invitation,
     guests,
     stats,
+    advancedStats: {
+      guestCount,
+      yesCount,
+      noCount,
+      pendingCount,
+      respondedCount,
+      responseRate,
+      yesRateAmongResponses
+    },
+    trend,
+    topPendingGuests,
     eventTypes: EVENT_TYPES,
     selectedEventType: sanitizeEventType(invitation.event_type),
     success: req.query.success || "",
@@ -700,7 +1048,10 @@ app.get("/tableau-de-bord/invitation/:id", requireAuth, (req, res) => {
 app.post(
   "/tableau-de-bord/invitation/:id/modifier",
   requireAuth,
-  upload.single("image"),
+  uploadInvitationAssets.fields([
+    { name: "image", maxCount: 1 },
+    { name: "guestsCsvFile", maxCount: 1 }
+  ]),
   (req, res) => {
     const invitation = db
       .prepare("SELECT * FROM invitations WHERE id = ? AND owner_user_id = ?")
@@ -710,6 +1061,7 @@ app.post(
     const eventType = sanitizeEventType(req.body.eventType || invitation.event_type);
     const coupleNames = String(req.body.coupleNames || "").trim();
     const eventDate = String(req.body.eventDate || "").trim();
+    const eventDateIso = normalizeIsoDateInput(req.body.eventDateIso);
     const venue = String(req.body.venue || "").trim();
     const message = String(req.body.message || "").trim();
     const ogTitle = String(req.body.ogTitle || "").trim();
@@ -721,15 +1073,18 @@ app.post(
       );
     }
 
-    const imagePath = req.file ? `/uploads/${req.file.filename}` : invitation.image_path;
+    const imageFile = req.files?.image?.[0];
+    const csvFile = req.files?.guestsCsvFile?.[0];
+    const imagePath = imageFile ? `/uploads/${imageFile.filename}` : invitation.image_path;
     db.prepare(
       `UPDATE invitations
-       SET event_type = ?, couple_names = ?, event_date = ?, venue = ?, message = ?, image_path = ?, og_title = ?, og_description = ?
+       SET event_type = ?, couple_names = ?, event_date = ?, event_date_iso = ?, venue = ?, message = ?, image_path = ?, og_title = ?, og_description = ?
        WHERE id = ?`
     ).run(
       eventType,
       coupleNames,
       eventDate,
+      eventDateIso,
       venue,
       message,
       imagePath,
@@ -738,7 +1093,12 @@ app.post(
       invitation.id
     );
 
-    const guests = parseGuests(req.body.newGuests || "");
+    const guests = mergeGuests(
+      parseGuests(req.body.newGuests || ""),
+      parseGuestsCsv(req.body.guestsCsv || ""),
+      parseGuestsCsv(decodeUploadedCsv(csvFile))
+    );
+    cleanupUploadedFile(csvFile);
     if (guests.length) {
       const tx = db.transaction(() => {
         const guestStmt = db.prepare(
@@ -768,6 +1128,30 @@ app.post("/tableau-de-bord/guest/:guestId/supprimer", requireAuth, (req, res) =>
 
   db.prepare("DELETE FROM guests WHERE id = ?").run(guest.id);
   return res.redirect(`/tableau-de-bord/invitation/${guest.invitation_id}?success=Invite+supprime.`);
+  }
+);
+
+app.post("/tableau-de-bord/guest/:guestId/modifier", requireAuth, (req, res) => {
+  const guest = db
+    .prepare(
+      `SELECT g.id, g.invitation_id
+       FROM guests g
+       INNER JOIN invitations i ON i.id = g.invitation_id
+       WHERE g.id = ? AND i.owner_user_id = ?`
+    )
+    .get(req.params.guestId, req.session.userId);
+  if (!guest) return res.status(404).render("not-found");
+
+  const fullName = String(req.body.fullName || "").trim();
+  const normalizedPhone = normalizePhone(req.body.phone || "");
+  const phone = normalizedPhone.length >= 8 ? normalizedPhone : null;
+
+  if (!fullName) {
+    return res.redirect(`/tableau-de-bord/invitation/${guest.invitation_id}?error=Le+nom+de+l+invite+est+obligatoire.`);
+  }
+
+  db.prepare("UPDATE guests SET full_name = ?, phone = ? WHERE id = ?").run(fullName, phone, guest.id);
+  return res.redirect(`/tableau-de-bord/invitation/${guest.invitation_id}?success=Invite+mis+a+jour.`);
 });
 
 app.get("/tableau-de-bord/invitation/:id/pdf", requireAuth, (req, res) => {
@@ -804,7 +1188,7 @@ app.get("/tableau-de-bord/invitation/:id/pdf", requireAuth, (req, res) => {
   doc.end();
 });
 
-app.get("/rsvp/:token", (req, res) => {
+app.get("/rsvp/:token", rsvpRateLimiter, (req, res) => {
   const data = db
     .prepare(
       `SELECT
@@ -812,6 +1196,11 @@ app.get("/rsvp/:token", (req, res) => {
          g.full_name,
          g.phone,
          g.rsvp_status,
+         g.plus_one,
+         g.attendee_count,
+         g.menu_choice,
+         g.allergies,
+         g.comment,
          g.responded_at,
          i.id AS invitation_id,
          i.event_type,
@@ -843,16 +1232,45 @@ app.get("/rsvp/:token", (req, res) => {
   });
 });
 
-app.post("/rsvp/:token", (req, res) => {
+app.post("/rsvp/:token", rsvpRateLimiter, (req, res) => {
   const status = req.body.status === "yes" ? "yes" : req.body.status === "no" ? "no" : null;
   if (!status) return res.redirect(`/rsvp/${req.params.token}`);
 
   const guest = db.prepare("SELECT * FROM guests WHERE token = ?").get(req.params.token);
   if (!guest) return res.status(404).render("not-found");
 
+  const requestedPlusOne = req.body.plusOne === "yes" ? 1 : 0;
+  const parsedAttendeeCount = Number.parseInt(String(req.body.attendeeCount || ""), 10);
+  const attendeeCount = Number.isInteger(parsedAttendeeCount)
+    ? Math.min(10, Math.max(1, parsedAttendeeCount))
+    : requestedPlusOne
+      ? 2
+      : 1;
+  const plusOne = requestedPlusOne || attendeeCount > 1 ? 1 : 0;
+  const allowedMenus = new Set(["standard", "vegetarien", "vegan", "halal", "sans-gluten", "autre"]);
+  const menuChoiceRaw = String(req.body.menuChoice || "").trim().toLowerCase();
+  const menuChoice = allowedMenus.has(menuChoiceRaw) ? menuChoiceRaw : null;
+  const allergies = String(req.body.allergies || "").trim().slice(0, 500);
+  const comment = String(req.body.comment || "").trim().slice(0, 700);
+
   const tx = db.transaction(() => {
-    db.prepare("UPDATE guests SET rsvp_status = ?, responded_at = CURRENT_TIMESTAMP WHERE id = ?").run(
+    db.prepare(
+      `UPDATE guests
+       SET rsvp_status = ?,
+           responded_at = CURRENT_TIMESTAMP,
+           plus_one = ?,
+           attendee_count = ?,
+           menu_choice = ?,
+           allergies = ?,
+           comment = ?
+       WHERE id = ?`
+    ).run(
       status,
+      plusOne,
+      attendeeCount,
+      status === "yes" ? menuChoice : null,
+      status === "yes" ? allergies || null : null,
+      comment || null,
       guest.id
     );
     db.prepare("INSERT INTO rsvp_events (invitation_id, guest_id, status) VALUES (?, ?, ?)").run(
@@ -865,6 +1283,109 @@ app.post("/rsvp/:token", (req, res) => {
 
   return res.redirect(`/rsvp/${req.params.token}?success=Votre+reponse+a+ete+enregistree.`);
 });
+
+let reminderDispatchInProgress = false;
+
+async function dispatchPendingRsvpReminders() {
+  if (!WHATSAPP_AUTO_ENABLED) return;
+  if (reminderDispatchInProgress) return;
+  const base = String(APP_BASE_URL || "").trim().replace(/\/$/, "");
+  if (!base) return;
+
+  reminderDispatchInProgress = true;
+  try {
+    const startedAt = new Date().toISOString();
+    let sent = 0;
+    let failed = 0;
+
+    const rows = db
+      .prepare(
+        `SELECT
+           g.id AS guest_id,
+           g.full_name,
+           g.phone,
+           g.token,
+           i.id AS invitation_id,
+           i.event_type,
+           i.couple_names,
+           i.event_date,
+           i.event_date_iso,
+           i.venue
+         FROM guests g
+         INNER JOIN invitations i ON i.id = g.invitation_id
+         WHERE g.rsvp_status = 'pending'
+           AND g.phone IS NOT NULL
+           AND TRIM(g.phone) <> ''
+           AND i.event_date_iso IS NOT NULL
+           AND TRIM(i.event_date_iso) <> ''`
+      )
+      .all();
+
+    const insertReminderStmt = db.prepare(
+      "INSERT INTO reminder_events (invitation_id, guest_id, reminder_key, whatsapp_status, detail) VALUES (?, ?, ?, 'pending', ?)"
+    );
+    const finalizeReminderStmt = db.prepare(
+      "UPDATE reminder_events SET whatsapp_status = ?, detail = ? WHERE guest_id = ? AND reminder_key = ?"
+    );
+
+    for (const row of rows) {
+      const days = daysUntilIsoDate(row.event_date_iso);
+      const reminderKey = days === 7 ? "J-7" : days === 3 ? "J-3" : null;
+      if (!reminderKey) continue;
+
+      const phone = normalizePhone(row.phone || "");
+      if (phone.length < 8) continue;
+
+      try {
+        insertReminderStmt.run(
+          row.invitation_id,
+          row.guest_id,
+          reminderKey,
+          `En cours d'envoi ${reminderKey} (${startedAt}).`
+        );
+      } catch {
+        continue;
+      }
+
+      const typeMeta = getEventTypeMeta(row.event_type);
+      const rsvpUrl = `${base}/rsvp/${row.token}`;
+      const reminderText =
+        `Rappel ${reminderKey}: ${row.couple_names} ${typeMeta.invitePhrase}.\n` +
+        `Date: ${row.event_date}\n` +
+        `Lieu: ${row.venue}\n` +
+        `Lien RSVP: ${rsvpUrl}`;
+
+      try {
+        const result = await sendWhatsAppTextMessage(phone, reminderText);
+        if (result.ok) {
+          sent += 1;
+          finalizeReminderStmt.run("sent", `Envoye ${new Date().toISOString()}`, row.guest_id, reminderKey);
+        } else {
+          failed += 1;
+          finalizeReminderStmt.run(
+            "failed",
+            `Echec ${new Date().toISOString()} :: ${result.error || "unknown"}`,
+            row.guest_id,
+            reminderKey
+          );
+        }
+      } catch (error) {
+        failed += 1;
+        finalizeReminderStmt.run(
+          "failed",
+          `Exception ${new Date().toISOString()} :: ${String(error?.message || error)}`,
+          row.guest_id,
+          reminderKey
+        );
+      }
+    }
+
+    const endedAt = new Date().toISOString();
+    appendWhatsAppLogLine(`[${endedAt}] reminders started=${startedAt} sent=${sent} failed=${failed}`);
+  } finally {
+    reminderDispatchInProgress = false;
+  }
+}
 
 app.get("/sante", (_req, res) => {
   return res.json({ ok: true, now: new Date().toISOString() });
@@ -907,6 +1428,20 @@ app.get("/sante/whatsapp-meta", async (_req, res) => {
     });
   }
 });
+
+if (WHATSAPP_AUTO_ENABLED && APP_BASE_URL) {
+  setTimeout(() => {
+    dispatchPendingRsvpReminders().catch((error) => {
+      appendWhatsAppLogLine(`[${new Date().toISOString()}] reminders startup error=${String(error?.message || error)}`);
+    });
+  }, 15000);
+
+  setInterval(() => {
+    dispatchPendingRsvpReminders().catch((error) => {
+      appendWhatsAppLogLine(`[${new Date().toISOString()}] reminders interval error=${String(error?.message || error)}`);
+    });
+  }, 6 * 60 * 60 * 1000);
+}
 
 app.use((_req, res) => res.status(404).render("not-found"));
 

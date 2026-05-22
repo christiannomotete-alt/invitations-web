@@ -10,6 +10,7 @@
       <p class="muted">Connectez-vous pour gerer vos invitations et vos confirmations RSVP.</p>
       <% if (error) { %><p class="alert error"><%= error %></p><% } %>
       <form class="stack" action="/connexion" method="post">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <label>Email
           <input name="email" type="email" required placeholder="vous@email.com">
         </label>

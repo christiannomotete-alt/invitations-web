@@ -108,6 +108,41 @@ function parseGuests(rawText) {
     .filter(Boolean);
 }
 
+function parseGuestsCsv(rawCsv) {
+  const lines = String(rawCsv || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (!lines.length) return [];
+
+  let startIndex = 0;
+  const first = lines[0].toLowerCase();
+  if (
+    (first.includes("nom") || first.includes("name")) &&
+    (first.includes("numero") || first.includes("phone") || first.includes("tel"))
+  ) {
+    startIndex = 1;
+  }
+
+  const rows = [];
+  for (let i = startIndex; i < lines.length; i += 1) {
+    const line = lines[i];
+    const parts = line.split(/[;,]/).map((p) => p.trim());
+    if (!parts.length) continue;
+    const fullName = String(parts[0] || "").trim();
+    const phoneRaw = String(parts[1] || "").trim();
+    const phone = normalizePhone(phoneRaw);
+    if (!fullName) continue;
+    rows.push({
+      fullName,
+      phone: phone.length >= 8 ? phone : null
+    });
+  }
+
+  return rows;
+}
+
 module.exports = {
   randomToken,
   normalizePhone,
@@ -119,5 +154,6 @@ module.exports = {
   baseUrl,
   isPublicHttpsUrl,
   buildEnvelopeMessage,
-  parseGuests
+  parseGuests,
+  parseGuestsCsv
 };

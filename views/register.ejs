@@ -10,6 +10,7 @@
       <p class="muted">Creez votre espace prive pour vos invitations.</p>
       <% if (error) { %><p class="alert error"><%= error %></p><% } %>
       <form class="stack" action="/inscription" method="post">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <label>Nom complet
           <input name="fullName" type="text" required placeholder="Amina et Daniel">
         </label>

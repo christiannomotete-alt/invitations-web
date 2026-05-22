@@ -13,12 +13,14 @@
         <div class="profile-dropdown" id="profileDropdown">
           <p class="profile-email">Email: <strong><%= currentUser.email %></strong></p>
           <form action="/tableau-de-bord/historique/supprimer" method="post" onsubmit="return confirm('Supprimer tout l\'historique des invitations ?');">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button class="menu-action danger-action" type="submit">Supprimer l'historique</button>
           </form>
           <button class="menu-action" id="showPasswordOption" type="button">
             Voir votre mot de passe
           </button>
           <form action="/deconnexion" method="post">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button class="menu-action" type="submit">Deconnexion</button>
           </form>
         </div>
