@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <%- include("partials/head", { title: "Apercu invitation", description: "Apercu avant partage WhatsApp" }) %>
+</head>
+<body>
+  <div class="page-wrap">
+    <%- include("partials/header", { currentUser }) %>
+    <main class="content">
+      <section class="hero-card">
+        <div>
+          <h1>Apercu avant envoi</h1>
+          <p class="muted"><%= invitation.couple_names %> - <%= eventTypeLabel %></p>
+        </div>
+        <div class="actions-inline">
+          <% if (guest.token !== "apercu") { %>
+            <a class="primary-btn" href="<%= rsvpUrl %>" target="_blank" rel="noopener">Ouvrir le RSVP</a>
+          <% } %>
+          <a class="ghost-btn" href="/tableau-de-bord/invitation/<%= invitation.id %>">Retour gestion</a>
+        </div>
+      </section>
+
+      <section class="grid two">
+        <article class="panel stack">
+          <h3>Carte partagee</h3>
+          <img class="cover-image" src="<%= invitation.image_path || '/default-og.jpg' %>" alt="Image de couverture invitation">
+          <p><strong>Date:</strong> <%= invitation.event_date %></p>
+          <p><strong>Lieu:</strong> <%= invitation.venue %></p>
+          <% if (invitation.schedule) { %><p><strong>Programme:</strong><br><%= invitation.schedule %></p><% } %>
+          <% if (invitation.dress_code) { %><p><strong>Dress code:</strong> <%= invitation.dress_code %></p><% } %>
+        </article>
+
+        <article class="panel stack">
+          <h3>Message WhatsApp exemple</h3>
+          <p class="tiny">Invite utilise pour l'aperçu: <strong><%= guest.full_name %></strong></p>
+          <textarea rows="12" readonly><%= message %></textarea>
+          <p><strong>Lien RSVP:</strong> <a href="<%= rsvpUrl %>" target="_blank" rel="noopener"><%= rsvpUrl %></a></p>
+          <p class="tiny">Image Open Graph: <%= imageUrl %></p>
+        </article>
+      </section>
+    </main>
+  </div>
+  <script src="/js/theme.js"></script>
+</body>
+</html>

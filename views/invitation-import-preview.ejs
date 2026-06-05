@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <%- include("partials/head", { title: "Previsualisation import", description: "Verifier les invites avant import" }) %>
+</head>
+<body>
+  <div class="page-wrap">
+    <%- include("partials/header", { currentUser }) %>
+    <main class="content">
+      <section class="hero-card">
+        <div>
+          <h1>Previsualisation import</h1>
+          <p class="muted"><%= invitation.couple_names %></p>
+        </div>
+        <a class="ghost-btn" href="/tableau-de-bord/invitation/<%= invitation.id %>">Retour gestion</a>
+      </section>
+
+      <form class="panel stack" action="/tableau-de-bord/invitation/<%= invitation.id %>/import/confirm" method="post">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="payload" value="<%= payload %>">
+        <% if (!rows.length) { %>
+          <p class="muted">Aucune ligne exploitable trouvee.</p>
+        <% } else { %>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Importer</th>
+                  <th>Nom</th>
+                  <th>Numero</th>
+                  <th>Table</th>
+                  <th>Place</th>
+                  <th>Categorie</th>
+                  <th>Accompagnants</th>
+                  <th>Statut</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% rows.forEach((row) => { %>
+                  <tr>
+                    <td data-label="Importer">
+                      <input type="checkbox" name="selected" value="<%= row.index %>" <%= row.duplicate ? "" : "checked" %> <%= row.duplicate ? "disabled" : "" %>>
+                    </td>
+                    <td data-label="Nom"><%= row.fullName %></td>
+                    <td data-label="Numero"><%= row.phone || "-" %></td>
+                    <td data-label="Table"><%= row.tableName || "-" %></td>
+                    <td data-label="Place"><%= row.seatLabel || "-" %></td>
+                    <td data-label="Categorie"><%= row.category || "-" %></td>
+                    <td data-label="Accompagnants"><%= row.maxPlusOnes ?? 1 %></td>
+                    <td data-label="Statut"><%= row.duplicate ? "Doublon ignore" : "Pret" %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <button class="primary-btn" type="submit">Confirmer l'import</button>
+        <% } %>
+      </form>
+    </main>
+  </div>
+  <script src="/js/theme.js"></script>
+</body>
+</html>

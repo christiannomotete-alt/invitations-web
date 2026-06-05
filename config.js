@@ -93,6 +93,10 @@ const SESSION_SECRET = process.env.SESSION_SECRET || "invitation-secret-dev";
 const NODE_ENV = process.env.NODE_ENV || "development";
 const isProduction = NODE_ENV === "production";
 
+if (isProduction && SESSION_SECRET === "invitation-secret-dev") {
+  throw new Error("SESSION_SECRET doit etre defini en production.");
+}
+
 const EVENT_TYPES = [
   { value: "mariage", label: "Mariage", invitePhrase: "vous invitent a leur mariage" },
   { value: "conference", label: "Conference", invitePhrase: "vous invitent a leur conference" },
@@ -102,6 +106,64 @@ const EVENT_TYPES = [
   { value: "seminaire", label: "Seminaire", invitePhrase: "vous invitent a leur seminaire" },
   { value: "ceremonie", label: "Ceremonie", invitePhrase: "vous invitent a leur ceremonie" },
   { value: "autre", label: "Autre", invitePhrase: "vous invitent a leur evenement" }
+];
+
+const INVITATION_TEMPLATES = [
+  {
+    value: "mariage-elegant",
+    label: "Mariage elegant",
+    eventType: "mariage",
+    message:
+      "Nous serions heureux de vous compter parmi nous pour celebrer ce moment unique. Merci de confirmer votre presence."
+  },
+  {
+    value: "anniversaire-festif",
+    label: "Anniversaire festif",
+    eventType: "anniversaire",
+    message:
+      "Une belle fete se prepare et votre presence compte beaucoup. Confirmez votre venue pour partager ce moment avec nous."
+  },
+  {
+    value: "conference-pro",
+    label: "Conference professionnelle",
+    eventType: "conference",
+    message:
+      "Vous etes invite a participer a notre rencontre. Merci de confirmer votre presence afin de faciliter l'organisation."
+  },
+  {
+    value: "concert-live",
+    label: "Concert live",
+    eventType: "concert",
+    message:
+      "Rejoignez-nous pour une soiree musicale. Confirmez votre presence pour recevoir les dernieres informations pratiques."
+  },
+  {
+    value: "ceremonie-classique",
+    label: "Ceremonie classique",
+    eventType: "ceremonie",
+    message:
+      "Votre presence honorera cette ceremonie. Merci de nous indiquer votre disponibilite via le lien RSVP."
+  }
+];
+
+const THEME_ACCENTS = [
+  { value: "bleu", label: "Bleu royal", color: "#0455bf" },
+  { value: "rose", label: "Rose ceremonie", color: "#c43d7d" },
+  { value: "vert", label: "Vert jardin", color: "#16804c" },
+  { value: "or", label: "Or classique", color: "#a66a00" },
+  { value: "ardoise", label: "Ardoise sobre", color: "#334155" }
+];
+
+const THEME_FONTS = [
+  { value: "sans", label: "Moderne" },
+  { value: "serif", label: "Elegant" },
+  { value: "classic", label: "Classique" }
+];
+
+const THEME_STYLES = [
+  { value: "envelope", label: "Enveloppe" },
+  { value: "card", label: "Carte simple" },
+  { value: "editorial", label: "Editorial" }
 ];
 
 module.exports = {
@@ -134,5 +196,9 @@ module.exports = {
   SESSION_SECRET,
   NODE_ENV,
   isProduction,
-  EVENT_TYPES
+  EVENT_TYPES,
+  INVITATION_TEMPLATES,
+  THEME_ACCENTS,
+  THEME_FONTS,
+  THEME_STYLES
 };

@@ -3,3 +3,4 @@ data/
 .env
 google-oauth-client.json
 whatsapp-config.json
+think/

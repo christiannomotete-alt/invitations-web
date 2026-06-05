@@ -16,7 +16,11 @@
           <p class="tiny">ID unique: <code><%= invitation.id %></code></p>
         </div>
         <div class="actions-inline">
+          <a class="ghost-btn" href="/tableau-de-bord/invitation/<%= invitation.id %>/apercu">Apercu</a>
+          <a class="ghost-btn" href="/tableau-de-bord/invitation/<%= invitation.id %>/tables">Tables</a>
+          <a class="ghost-btn" href="/tableau-de-bord/invitation/<%= invitation.id %>/scanner">Scanner QR</a>
           <a class="ghost-btn" href="/tableau-de-bord/invitation/<%= invitation.id %>/pdf">Telecharger PDF</a>
+          <a class="ghost-btn" href="/tableau-de-bord/invitation/<%= invitation.id %>/export.csv">Exporter CSV</a>
           <form action="/tableau-de-bord/invitation/<%= invitation.id %>/dupliquer" method="post">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button class="ghost-btn" type="submit">Dupliquer</button>
@@ -42,8 +46,21 @@
           <h3>Edition rapide</h3>
           <form class="stack" action="/tableau-de-bord/invitation/<%= invitation.id %>/modifier?_csrf=<%= encodeURIComponent(csrfToken) %>" method="post" enctype="multipart/form-data">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <label>Modele d'invitation
+              <select name="templateKey" id="templateKey">
+                <option value="">Personnalise</option>
+                <% (invitationTemplates || []).forEach((template) => { %>
+                  <option
+                    value="<%= template.value %>"
+                    data-event-type="<%= template.eventType %>"
+                    data-message="<%= template.message %>"
+                    <%= invitation.template_key === template.value ? "selected" : "" %>
+                  ><%= template.label %></option>
+                <% }) %>
+              </select>
+            </label>
             <label>Type d'invitation
-              <select name="eventType" required>
+              <select name="eventType" id="eventType" required>
                 <% eventTypes.forEach((type) => { %>
                   <option value="<%= type.value %>" <%= selectedEventType === type.value ? "selected" : "" %>><%= type.label %></option>
                 <% }) %>
@@ -62,8 +79,53 @@
               <input name="venue" type="text" required value="<%= invitation.venue %>">
             </label>
             <label>Message
-              <textarea name="message" rows="3" required><%= invitation.message %></textarea>
+              <textarea name="message" id="message" rows="3" required><%= invitation.message %></textarea>
             </label>
+            <section class="subpanel stack">
+              <h3>Style visuel</h3>
+              <div class="grid three compact-grid">
+                <label>Couleur principale
+                  <select name="themeAccent">
+                    <% (themeAccents || []).forEach((accent) => { %>
+                      <option value="<%= accent.value %>" <%= (invitation.theme_accent || "bleu") === accent.value ? "selected" : "" %>><%= accent.label %></option>
+                    <% }) %>
+                  </select>
+                </label>
+                <label>Typographie
+                  <select name="themeFont">
+                    <% (themeFonts || []).forEach((font) => { %>
+                      <option value="<%= font.value %>" <%= (invitation.theme_font || "sans") === font.value ? "selected" : "" %>><%= font.label %></option>
+                    <% }) %>
+                  </select>
+                </label>
+                <label>Presentation
+                  <select name="themeStyle">
+                    <% (themeStyles || []).forEach((style) => { %>
+                      <option value="<%= style.value %>" <%= (invitation.theme_style || "envelope") === style.value ? "selected" : "" %>><%= style.label %></option>
+                    <% }) %>
+                  </select>
+                </label>
+              </div>
+            </section>
+            <div class="grid two compact-grid">
+              <label>Capacite totale
+                <input name="capacity" type="number" min="1" value="<%= invitation.capacity || '' %>">
+              </label>
+              <label>Telephone organisateur
+                <input name="organizerPhone" type="tel" value="<%= invitation.organizer_phone || '' %>" placeholder="22890000000">
+              </label>
+            </div>
+            <label>Programme / horaires
+              <textarea name="schedule" rows="3"><%= invitation.schedule || '' %></textarea>
+            </label>
+            <div class="grid two compact-grid">
+              <label>Dress code
+                <input name="dressCode" type="text" value="<%= invitation.dress_code || '' %>">
+              </label>
+              <label>Lien carte / itineraire
+                <input name="mapUrl" type="url" value="<%= invitation.map_url || '' %>">
+              </label>
+            </div>
             <label>Nouvelle image (optionnel)
               <input name="image" type="file" accept="image/png,image/jpeg,image/webp">
             </label>
@@ -94,6 +156,10 @@
             <span>Taux de reponse: <strong><%= advancedStats.responseRate %>%</strong></span>
             <span>Reponses recues: <strong><%= advancedStats.respondedCount %>/<%= advancedStats.guestCount %></strong></span>
             <span>Taux de presence: <strong><%= advancedStats.yesRateAmongResponses %>%</strong></span>
+            <span>Personnes attendues: <strong><%= advancedStats.attendeeCount %><%= advancedStats.capacity ? `/${advancedStats.capacity}` : "" %></strong></span>
+            <% if (advancedStats.capacity) { %>
+              <span>Capacite utilisee: <strong><%= advancedStats.capacityRate %>%</strong></span>
+            <% } %>
           </div>
         </article>
         <article class="panel">
@@ -158,6 +224,33 @@
       </section>
 
       <section class="panel">
+        <h3>Relances WhatsApp</h3>
+        <form class="actions-inline" action="/tableau-de-bord/invitation/<%= invitation.id %>/relancer" method="post" onsubmit="return confirm('Envoyer cette relance WhatsApp ?');">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <select name="scope" aria-label="Invites a relancer">
+            <option value="pending">Non-repondants</option>
+            <option value="failed">Derniers echecs WhatsApp</option>
+            <option value="all">Tous les invites</option>
+          </select>
+          <button class="primary-btn" type="submit">Envoyer la relance</button>
+        </form>
+      </section>
+
+      <section class="panel stack">
+        <h3>Import avec previsualisation</h3>
+        <form class="stack" action="/tableau-de-bord/invitation/<%= invitation.id %>/import/preview" method="post" enctype="multipart/form-data">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <label>Coller un CSV enrichi
+            <textarea name="guestsCsv" rows="4" placeholder="nom,numero,table,place,categorie,accompagnants&#10;Marie,22890000000,Table 1,A1,Famille,1"></textarea>
+          </label>
+          <label>Importer CSV ou Excel (.xlsx)
+            <input name="guestsCsvFile" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+          </label>
+          <button class="primary-btn" type="submit">Previsualiser l'import</button>
+        </form>
+      </section>
+
+      <section class="panel">
         <h3>Liste des invites et partage WhatsApp</h3>
         <% if (!guests.length) { %>
           <p class="muted">Aucun invite pour le moment.</p>
@@ -169,7 +262,10 @@
                   <th>Nom</th>
                   <th>Numero</th>
                   <th>Statut</th>
+                  <th>Placement</th>
                   <th>Details RSVP</th>
+                  <th>WhatsApp</th>
+                  <th>Controle</th>
                   <th>Lien unique</th>
                   <th>Actions</th>
                 </tr>
@@ -177,14 +273,19 @@
               <tbody>
                 <% guests.forEach((guest) => { %>
                   <tr>
-                    <td><%= guest.full_name %></td>
-                    <td><%= guest.phone || '-' %></td>
-                    <td>
+                    <td data-label="Nom"><%= guest.full_name %></td>
+                    <td data-label="Numero"><%= guest.phone || '-' %></td>
+                    <td data-label="Statut">
                       <% if (guest.rsvp_status === "yes") { %>Present<% } %>
                       <% if (guest.rsvp_status === "no") { %>Absent<% } %>
                       <% if (guest.rsvp_status === "pending") { %>En attente<% } %>
                     </td>
-                    <td class="tiny">
+                    <td data-label="Placement" class="tiny">
+                      <div>Categorie: <strong><%= guest.category || "-" %></strong></div>
+                      <div>Table: <strong><%= guest.table_name || "-" %></strong></div>
+                      <div>Place: <strong><%= guest.seat_label || "-" %></strong></div>
+                    </td>
+                    <td data-label="Details RSVP" class="tiny">
                       <% if (guest.rsvp_status === "yes") { %>
                         <div>Personnes: <strong><%= guest.attendee_count || 1 %></strong></div>
                         <div>+1: <strong><%= guest.plus_one ? "Oui" : "Non" %></strong></div>
@@ -195,16 +296,34 @@
                         <span>-</span>
                       <% } %>
                     </td>
-                    <td><a href="<%= guest.invitationUrl %>" target="_blank" rel="noopener">Lien RSVP</a></td>
-                    <td>
+                    <td data-label="WhatsApp" class="tiny">
+                      <div>Statut: <strong><%= guest.whatsapp_status || "not_sent" %></strong></div>
+                      <div>Dernier envoi: <strong><%= guest.whatsapp_sent_at || "-" %></strong></div>
+                      <div>Relance: <strong><%= guest.last_reminder_at || "-" %></strong></div>
+                      <div><%= guest.whatsapp_detail || "-" %></div>
+                    </td>
+                    <td data-label="Controle" class="tiny">
+                      <div>Check-in: <strong><%= guest.checked_in_at || "-" %></strong></div>
+                      <a href="/tableau-de-bord/guest/<%= guest.id %>/qr.svg" target="_blank" rel="noopener">QR entree</a>
+                    </td>
+                    <td data-label="Lien unique"><a href="<%= guest.invitationUrl %>" target="_blank" rel="noopener">Lien RSVP</a></td>
+                    <td data-label="Actions">
                       <div class="actions-inline">
                         <form class="stack" action="/tableau-de-bord/guest/<%= guest.id %>/modifier" method="post" style="min-width: 220px;">
                           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                           <input name="fullName" type="text" value="<%= guest.full_name %>" required>
                           <input name="phone" type="text" value="<%= guest.phone || '' %>" placeholder="22890000000">
+                          <input name="category" type="text" value="<%= guest.category || '' %>" placeholder="Categorie">
+                          <input name="tableName" type="text" value="<%= guest.table_name || '' %>" placeholder="Table">
+                          <input name="seatLabel" type="text" value="<%= guest.seat_label || '' %>" placeholder="Place">
+                          <input name="maxPlusOnes" type="number" min="0" max="9" value="<%= guest.max_plus_ones ?? 1 %>" aria-label="Accompagnants autorises">
                           <button class="ghost-btn" type="submit">Mettre a jour</button>
                         </form>
                         <a class="ghost-btn" href="<%= guest.whatsappLink %>" target="_blank" rel="noopener">WhatsApp</a>
+                        <form action="/tableau-de-bord/guest/<%= guest.id %>/checkin" method="post">
+                          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                          <button class="ghost-btn" type="submit">Check-in</button>
+                        </form>
                         <form action="/tableau-de-bord/guest/<%= guest.id %>/supprimer" method="post">
                           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                           <button class="ghost-btn" type="submit">Supprimer</button>
@@ -220,6 +339,18 @@
       </section>
     </main>
   </div>
+  <script>
+    const templateSelect = document.getElementById("templateKey");
+    const eventTypeSelect = document.getElementById("eventType");
+    const messageField = document.getElementById("message");
+    templateSelect?.addEventListener("change", () => {
+      const option = templateSelect.selectedOptions[0];
+      const eventType = option?.dataset.eventType || "";
+      const message = option?.dataset.message || "";
+      if (eventType) eventTypeSelect.value = eventType;
+      if (message && !messageField.value.trim()) messageField.value = message;
+    });
+  </script>
   <script src="/js/theme.js"></script>
 </body>
 </html>

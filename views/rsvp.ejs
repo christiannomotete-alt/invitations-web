@@ -12,7 +12,28 @@
   <meta name="twitter:title" content="<%= ogTitle %>">
   <meta name="twitter:description" content="<%= ogDescription %>">
   <meta name="twitter:image" content="<%= imageUrl %>">
+  <%
+    const accentColors = {
+      bleu: "#0455bf",
+      rose: "#c43d7d",
+      vert: "#16804c",
+      or: "#a66a00",
+      ardoise: "#334155"
+    };
+    const themeAccent = accentColors[data.theme_accent] || accentColors.bleu;
+    const themeFontFamily =
+      data.theme_font === "serif"
+        ? '"Playfair Display", Georgia, serif'
+        : data.theme_font === "classic"
+          ? 'Georgia, "Times New Roman", serif'
+          : '"Plus Jakarta Sans", "Segoe UI", sans-serif';
+    const themeStyle = ["card", "editorial"].includes(data.theme_style) ? data.theme_style : "envelope";
+  %>
   <style>
+    :root {
+      --rsvp-accent: <%= themeAccent %>;
+      --rsvp-font: <%- themeFontFamily %>;
+    }
     body {
       margin: 0;
       min-height: 100vh;
@@ -24,7 +45,7 @@
         radial-gradient(circle at 90% 0%, rgba(228, 76, 154, 0.14), transparent 35%),
         radial-gradient(circle at 50% 100%, rgba(122, 174, 255, 0.22), transparent 38%),
         #eef3ff;
-      font-family: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+      font-family: var(--rsvp-font);
       color: #162447;
     }
     .scene {
@@ -51,7 +72,7 @@
       font-weight: 700;
       font-size: 0.95rem;
       color: #fff;
-      background: linear-gradient(140deg, #0455bf, #307ce4);
+      background: linear-gradient(140deg, var(--rsvp-accent), color-mix(in srgb, var(--rsvp-accent) 72%, #ffffff));
       box-shadow: 0 12px 24px rgba(15, 46, 123, 0.28);
       cursor: pointer;
     }
@@ -104,7 +125,7 @@
       place-items: center;
       color: #fff;
       font-weight: 800;
-      background: linear-gradient(140deg, #0455bf, #307ce4);
+      background: linear-gradient(140deg, var(--rsvp-accent), color-mix(in srgb, var(--rsvp-accent) 72%, #ffffff));
       z-index: 6;
       transition: opacity 0.35s ease;
     }
@@ -242,6 +263,34 @@
     .flash-toast.show {
       opacity: 1;
     }
+    .scene.style-card .env-back,
+    .scene.style-card .env-front,
+    .scene.style-card .env-flap,
+    .scene.style-card .seal,
+    .scene.style-editorial .env-back,
+    .scene.style-editorial .env-front,
+    .scene.style-editorial .env-flap,
+    .scene.style-editorial .seal {
+      display: none;
+    }
+    .scene.style-card .envelope,
+    .scene.style-editorial .envelope {
+      overflow: visible;
+    }
+    .scene.style-card .invitation,
+    .scene.style-editorial .invitation {
+      transform: translateX(-50%) translateY(-4%);
+      z-index: 7;
+      max-height: 78vh;
+    }
+    .scene.style-card .open-toggle,
+    .scene.style-editorial .open-toggle {
+      display: none;
+    }
+    .scene.style-editorial .invitation {
+      border-left: 6px solid var(--rsvp-accent);
+      border-radius: 10px;
+    }
     @media (max-width: 760px) {
       .scene {
         width: min(560px, 97vw);
@@ -305,7 +354,7 @@
   </style>
 </head>
 <body>
-  <main class="scene" id="scene" data-auto-open="<%= success ? '1' : '0' %>">
+  <main class="scene style-<%= themeStyle %>" id="scene" data-auto-open="<%= success || themeStyle !== 'envelope' ? '1' : '0' %>">
     <% if (success) { %>
       <div class="flash-toast" id="successToast"><%= success %></div>
     <% } %>
@@ -321,6 +370,15 @@
           <% } %>
           <p><strong>Date:</strong> <%= data.event_date %></p>
           <p><strong>Lieu:</strong> <%= data.venue %></p>
+          <% if (data.schedule) { %>
+            <p><strong>Programme:</strong><br><%= data.schedule %></p>
+          <% } %>
+          <% if (data.dress_code) { %>
+            <p><strong>Dress code:</strong> <%= data.dress_code %></p>
+          <% } %>
+          <% if (data.map_url) { %>
+            <p><a href="<%= data.map_url %>" target="_blank" rel="noopener">Voir l'itineraire</a></p>
+          <% } %>
           <p><%= data.message %></p>
           <p>
             <strong>Statut actuel:</strong>
@@ -338,7 +396,7 @@
                 </select>
               </label>
               <label>Nombre total de personnes
-                <input name="attendeeCount" type="number" min="1" max="10" value="<%= data.attendee_count || 1 %>">
+                <input name="attendeeCount" type="number" min="1" max="<%= Math.max(1, Math.min(10, Number(data.max_plus_ones || 1) + 1)) %>" value="<%= data.attendee_count || 1 %>">
               </label>
               <label>Menu prefere
                 <select name="menuChoice">

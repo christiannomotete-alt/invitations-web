@@ -34,6 +34,29 @@ function ensureInvitationEventDateIsoColumn() {
   }
 }
 
+function ensureInvitationPlanningColumns() {
+  const columns = db.prepare("PRAGMA table_info(invitations)").all();
+  const hasTemplateKey = columns.some((col) => col.name === "template_key");
+  const hasCapacity = columns.some((col) => col.name === "capacity");
+  const hasOrganizerPhone = columns.some((col) => col.name === "organizer_phone");
+  const hasSchedule = columns.some((col) => col.name === "schedule");
+  const hasDressCode = columns.some((col) => col.name === "dress_code");
+  const hasMapUrl = columns.some((col) => col.name === "map_url");
+  const hasThemeAccent = columns.some((col) => col.name === "theme_accent");
+  const hasThemeFont = columns.some((col) => col.name === "theme_font");
+  const hasThemeStyle = columns.some((col) => col.name === "theme_style");
+
+  if (!hasTemplateKey) db.exec("ALTER TABLE invitations ADD COLUMN template_key TEXT");
+  if (!hasCapacity) db.exec("ALTER TABLE invitations ADD COLUMN capacity INTEGER");
+  if (!hasOrganizerPhone) db.exec("ALTER TABLE invitations ADD COLUMN organizer_phone TEXT");
+  if (!hasSchedule) db.exec("ALTER TABLE invitations ADD COLUMN schedule TEXT");
+  if (!hasDressCode) db.exec("ALTER TABLE invitations ADD COLUMN dress_code TEXT");
+  if (!hasMapUrl) db.exec("ALTER TABLE invitations ADD COLUMN map_url TEXT");
+  if (!hasThemeAccent) db.exec("ALTER TABLE invitations ADD COLUMN theme_accent TEXT");
+  if (!hasThemeFont) db.exec("ALTER TABLE invitations ADD COLUMN theme_font TEXT");
+  if (!hasThemeStyle) db.exec("ALTER TABLE invitations ADD COLUMN theme_style TEXT");
+}
+
 function ensureGuestRsvpDetailColumns() {
   const columns = db.prepare("PRAGMA table_info(guests)").all();
   const hasPlusOne = columns.some((col) => col.name === "plus_one");
@@ -49,8 +72,37 @@ function ensureGuestRsvpDetailColumns() {
   if (!hasComment) db.exec("ALTER TABLE guests ADD COLUMN comment TEXT");
 }
 
+function ensureGuestOperationsColumns() {
+  const columns = db.prepare("PRAGMA table_info(guests)").all();
+  const hasCategory = columns.some((col) => col.name === "category");
+  const hasTableName = columns.some((col) => col.name === "table_name");
+  const hasSeatLabel = columns.some((col) => col.name === "seat_label");
+  const hasMaxPlusOnes = columns.some((col) => col.name === "max_plus_ones");
+  const hasWhatsappStatus = columns.some((col) => col.name === "whatsapp_status");
+  const hasWhatsappDetail = columns.some((col) => col.name === "whatsapp_detail");
+  const hasWhatsappSentAt = columns.some((col) => col.name === "whatsapp_sent_at");
+  const hasLastReminderAt = columns.some((col) => col.name === "last_reminder_at");
+  const hasCheckedInAt = columns.some((col) => col.name === "checked_in_at");
+
+  if (!hasCategory) db.exec("ALTER TABLE guests ADD COLUMN category TEXT");
+  if (!hasTableName) db.exec("ALTER TABLE guests ADD COLUMN table_name TEXT");
+  if (!hasSeatLabel) db.exec("ALTER TABLE guests ADD COLUMN seat_label TEXT");
+  if (!hasMaxPlusOnes) db.exec("ALTER TABLE guests ADD COLUMN max_plus_ones INTEGER NOT NULL DEFAULT 1");
+  if (!hasWhatsappStatus) db.exec("ALTER TABLE guests ADD COLUMN whatsapp_status TEXT NOT NULL DEFAULT 'not_sent'");
+  if (!hasWhatsappDetail) db.exec("ALTER TABLE guests ADD COLUMN whatsapp_detail TEXT");
+  if (!hasWhatsappSentAt) db.exec("ALTER TABLE guests ADD COLUMN whatsapp_sent_at TEXT");
+  if (!hasLastReminderAt) db.exec("ALTER TABLE guests ADD COLUMN last_reminder_at TEXT");
+  if (!hasCheckedInAt) db.exec("ALTER TABLE guests ADD COLUMN checked_in_at TEXT");
+}
+
 function initSchema() {
   db.exec(`
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT UNIQUE NOT NULL,
+  applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   full_name TEXT NOT NULL,
@@ -71,6 +123,15 @@ CREATE TABLE IF NOT EXISTS invitations (
   image_path TEXT,
   og_title TEXT,
   og_description TEXT,
+  template_key TEXT,
+  capacity INTEGER,
+  organizer_phone TEXT,
+  schedule TEXT,
+  dress_code TEXT,
+  map_url TEXT,
+  theme_accent TEXT,
+  theme_font TEXT,
+  theme_style TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY(owner_user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -87,6 +148,15 @@ CREATE TABLE IF NOT EXISTS guests (
   menu_choice TEXT,
   allergies TEXT,
   comment TEXT,
+  category TEXT,
+  table_name TEXT,
+  seat_label TEXT,
+  max_plus_ones INTEGER NOT NULL DEFAULT 1,
+  whatsapp_status TEXT NOT NULL DEFAULT 'not_sent',
+  whatsapp_detail TEXT,
+  whatsapp_sent_at TEXT,
+  last_reminder_at TEXT,
+  checked_in_at TEXT,
   responded_at TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY(invitation_id) REFERENCES invitations(id) ON DELETE CASCADE
@@ -118,7 +188,11 @@ CREATE TABLE IF NOT EXISTS reminder_events (
   ensureUsersGoogleColumn();
   ensureInvitationEventTypeColumn();
   ensureInvitationEventDateIsoColumn();
+  ensureInvitationPlanningColumns();
   ensureGuestRsvpDetailColumns();
+  ensureGuestOperationsColumns();
+  db.prepare("INSERT OR IGNORE INTO schema_migrations (name) VALUES (?)").run("2026-06-04-operations-fields");
+  db.prepare("INSERT OR IGNORE INTO schema_migrations (name) VALUES (?)").run("2026-06-05-visual-fields");
 }
 
 function repairGuestsPhoneData(dbInstance, extractPhoneFromText) {

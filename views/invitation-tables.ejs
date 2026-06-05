@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <%- include("partials/head", { title: "Gestion des tables", description: "Placement et check-in par table" }) %>
+</head>
+<body>
+  <div class="page-wrap">
+    <%- include("partials/header", { currentUser }) %>
+    <main class="content">
+      <section class="hero-card">
+        <div>
+          <h1>Tables: <%= invitation.couple_names %></h1>
+          <p class="muted">Organisez les invites par table, place et categorie.</p>
+        </div>
+        <div class="actions-inline">
+          <a class="ghost-btn" href="/tableau-de-bord/invitation/<%= invitation.id %>/scanner">Scanner QR</a>
+          <a class="ghost-btn" href="/tableau-de-bord/invitation/<%= invitation.id %>">Retour gestion</a>
+        </div>
+      </section>
+
+      <% if (success) { %><p class="alert success"><%= success %></p><% } %>
+      <% if (error) { %><p class="alert error"><%= error %></p><% } %>
+
+      <section class="panel stack">
+        <h3>Affectation rapide</h3>
+        <form class="stack" action="/tableau-de-bord/invitation/<%= invitation.id %>/tables" method="post">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <label>Une ligne par invite: Nom ou numero | Table | Place | Categorie
+            <textarea name="assignments" rows="6" placeholder="Marie Test|Table 1|A1|Famille&#10;22890000000|VIP|B2|VIP"></textarea>
+          </label>
+          <button class="primary-btn" type="submit">Mettre a jour les tables</button>
+        </form>
+      </section>
+
+      <section class="grid cards">
+        <% tables.forEach((table) => { %>
+          <article class="panel stack">
+            <div>
+              <h3><%= table.name %></h3>
+              <div class="stats">
+                <span>Invites: <strong><%= table.invitedCount %></strong></span>
+                <span>Personnes prevues: <strong><%= table.attendeeCount %></strong></span>
+                <span>Check-in: <strong><%= table.checkedInCount %></strong></span>
+              </div>
+            </div>
+            <div class="table-list">
+              <% table.guests.forEach((guest) => { %>
+                <div class="table-seat">
+                  <div>
+                    <strong><%= guest.full_name %></strong>
+                    <p class="tiny"><%= guest.category || "Sans categorie" %> - Place <%= guest.seat_label || "-" %></p>
+                  </div>
+                  <span class="status-pill <%= guest.checked_in_at ? 'ok' : '' %>"><%= guest.checked_in_at ? "Entre" : "Attendu" %></span>
+                </div>
+              <% }) %>
+            </div>
+          </article>
+        <% }) %>
+      </section>
+    </main>
+  </div>
+  <script src="/js/theme.js"></script>
+</body>
+</html>

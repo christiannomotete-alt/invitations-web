@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <%- include("partials/head", { title: "Scanner QR", description: "Controle d'entree par QR code" }) %>
+</head>
+<body>
+  <div class="page-wrap">
+    <%- include("partials/header", { currentUser }) %>
+    <main class="content">
+      <section class="hero-card">
+        <div>
+          <h1>Scanner QR</h1>
+          <p class="muted"><%= invitation.couple_names %></p>
+          <div class="stats">
+            <span>Total: <strong><%= stats.total || 0 %></strong></span>
+            <span>Entres: <strong id="checkedCount"><%= stats.checked_in || 0 %></strong></span>
+          </div>
+        </div>
+        <div class="actions-inline">
+          <a class="ghost-btn" href="/tableau-de-bord/invitation/<%= invitation.id %>/tables">Tables</a>
+          <a class="ghost-btn" href="/tableau-de-bord/invitation/<%= invitation.id %>">Retour gestion</a>
+        </div>
+      </section>
+
+      <section class="grid two">
+        <article class="panel stack">
+          <h3>Camera</h3>
+          <video class="scanner-video" id="scannerVideo" autoplay muted playsinline></video>
+          <div class="actions-inline">
+            <button class="primary-btn" id="startScanner" type="button">Demarrer camera</button>
+            <button class="ghost-btn" id="stopScanner" type="button">Arreter</button>
+          </div>
+          <p class="tiny" id="scannerHelp">Utilisez Chrome/Edge recent pour le scan automatique. Sinon, collez le lien ou token ci-dessous.</p>
+        </article>
+
+        <article class="panel stack">
+          <h3>Validation</h3>
+          <form class="stack" id="manualForm">
+            <label>Lien QR ou token
+              <input id="manualCode" type="text" placeholder="<%= checkInBaseUrl %>...">
+            </label>
+            <button class="primary-btn" type="submit">Valider l'entree</button>
+          </form>
+          <div class="scan-result" id="scanResult">En attente d'un QR.</div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const csrfToken = "<%= csrfToken %>";
+    const endpoint = "/tableau-de-bord/invitation/<%= invitation.id %>/scanner/check-in";
+    const video = document.getElementById("scannerVideo");
+    const resultBox = document.getElementById("scanResult");
+    const checkedCount = document.getElementById("checkedCount");
+    let stream = null;
+    let detector = null;
+    let scanning = false;
+    let lastCode = "";
+    let lastAt = 0;
+
+    function setResult(message, ok) {
+      resultBox.textContent = message;
+      resultBox.classList.toggle("ok", Boolean(ok));
+      resultBox.classList.toggle("error", ok === false);
+    }
+
+    async function submitCode(code) {
+      const value = String(code || "").trim();
+      if (!value) return;
+      const now = Date.now();
+      if (value === lastCode && now - lastAt < 3000) return;
+      lastCode = value;
+      lastAt = now;
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-CSRF-Token": csrfToken
+        },
+        body: new URLSearchParams({ token: value, _csrf: csrfToken })
+      });
+      const payload = await response.json();
+      if (!payload.ok) {
+        setResult(payload.error || "Validation impossible.", false);
+        return;
+      }
+      if (!payload.alreadyChecked) {
+        checkedCount.textContent = String(Number(checkedCount.textContent || "0") + 1);
+      }
+      setResult(`${payload.guestName} - ${payload.alreadyChecked ? "deja valide" : "entree validee"}`, true);
+    }
+
+    async function scanLoop() {
+      if (!scanning || !detector) return;
+      try {
+        const codes = await detector.detect(video);
+        if (codes.length) await submitCode(codes[0].rawValue);
+      } catch {
+        return;
+      }
+      requestAnimationFrame(scanLoop);
+    }
+
+    document.getElementById("startScanner").addEventListener("click", async () => {
+      if (!("BarcodeDetector" in window)) {
+        setResult("Scan camera non supporte par ce navigateur. Utilisez la saisie manuelle.", false);
+        return;
+      }
+      detector = new BarcodeDetector({ formats: ["qr_code"] });
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      video.srcObject = stream;
+      scanning = true;
+      setResult("Camera active. Presentez un QR code.", true);
+      scanLoop();
+    });
+
+    document.getElementById("stopScanner").addEventListener("click", () => {
+      scanning = false;
+      if (stream) stream.getTracks().forEach((track) => track.stop());
+      stream = null;
+      video.srcObject = null;
+      setResult("Scanner arrete.", null);
+    });
+
+    document.getElementById("manualForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await submitCode(document.getElementById("manualCode").value);
+      document.getElementById("manualCode").value = "";
+    });
+  </script>
+  <script src="/js/theme.js"></script>
+</body>
+</html>

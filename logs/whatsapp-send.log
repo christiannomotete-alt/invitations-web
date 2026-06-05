@@ -2,3 +2,9 @@
 [2026-05-22T01:23:58.902Z] invitation=415623eedac3e5fe3277 guest="Christian" phone="22899534728" status=SENT detail="Template/message envoye; template=invitation_rsvp; fallback=no; image=template_header_rejected_then_image_sent_separately"
 [2026-05-22T01:27:40.928Z] invitation=b3e2b905bb750f77b401 total=1 sent=1 failed=0 skipped=0
 [2026-05-22T01:27:40.928Z] invitation=b3e2b905bb750f77b401 guest="Christian" phone="22899534728" status=SENT detail="Template/message envoye; template=invitation_rsvp; fallback=no; image=template_header_rejected_then_image_sent_separately"
+[2026-06-04T23:30:53.845Z] invitation=c8d53ffc707bc3a67423 total=2 sent=0 failed=0 skipped=2
+[2026-06-04T23:30:53.845Z] invitation=c8d53ffc707bc3a67423 guest="Marie Test" phone="22891111111" status=SKIPPED_NOT_CONFIGURED detail="Envoi automatique non configure"
+[2026-06-04T23:30:53.845Z] invitation=c8d53ffc707bc3a67423 guest="Paul Test" phone="22892222222" status=SKIPPED_NOT_CONFIGURED detail="Envoi automatique non configure"
+[2026-06-04T23:32:53.748Z] invitation=8103ca2aae99b6bbad43 total=1 sent=0 failed=0 skipped=1
+[2026-06-04T23:32:53.748Z] invitation=8103ca2aae99b6bbad43 guest="Invite HTTP" phone="22893333333" status=SKIPPED_NOT_CONFIGURED detail="Envoi automatique non configure"
+[2026-06-05T01:36:56.353Z] invitation=9b649762f5086fb18a6b total=0 sent=0 failed=0 skipped=0

@@ -143,6 +143,12 @@ function parseGuestsCsv(rawCsv) {
   return rows;
 }
 
+function csvCell(value) {
+  const text = String(value ?? "");
+  if (!/[",\r\n;]/.test(text)) return text;
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
 module.exports = {
   randomToken,
   normalizePhone,
@@ -155,5 +161,6 @@ module.exports = {
   isPublicHttpsUrl,
   buildEnvelopeMessage,
   parseGuests,
-  parseGuestsCsv
+  parseGuestsCsv,
+  csvCell
 };
