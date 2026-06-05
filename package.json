@@ -20,6 +20,7 @@
     "passport-google-oauth20": "^2.0.0",
     "pdfkit": "^0.17.2",
     "qrcode": "^1.5.4",
-    "read-excel-file": "^5.8.8"
+    "read-excel-file": "^5.8.8",
+    "xlsx": "^0.18.5"
   }
 }
